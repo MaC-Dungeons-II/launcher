@@ -7,10 +7,15 @@ Microsoft Store edition). You sign in with your Microsoft account and the app
 downloads the game from Microsoft under your own license. It then runs the game
 through Wine with a small compatibility layer. No virtual machine is needed.
 
-> Not affiliated with, endorsed by, or sponsored by Mojang, Microsoft or Xbox.
-> Minecraft and Minecraft Dungeons are trademarks of Microsoft.
-> You need to own the game. Nothing here bypasses the license check: ownership
-> is confirmed with the Microsoft-signed license token for your account.
+> [!CAUTION]
+> This is an unofficial project. Use it at your own risk. It is not affiliated
+> with, endorsed by, or sponsored by Mojang, Microsoft or Xbox. Minecraft,
+> Minecraft Dungeons and all other trademarks, product names, and company names
+> or logos mentioned here are the property of their respective owners.
+
+> [!IMPORTANT]
+> You need your own copy of the game. Nothing here bypasses the license check:
+> ownership is confirmed with the Microsoft-signed license token for your account.
 
 ## What it does
 

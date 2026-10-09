@@ -4,7 +4,10 @@
 
 **Minecraft Dungeons II**(Minecraft Launcher / Microsoft Store판)를 macOS에서 실행하는 비공식 런처입니다. Microsoft 계정으로 로그인하면 본인 라이선스로 Microsoft에서 게임을 내려받고, 작은 호환 레이어를 얹은 Wine에서 실행합니다. 가상 머신은 필요 없습니다.
 
-> Mojang, Microsoft, Xbox와 관련이 없으며 이들의 승인이나 후원을 받지 않았습니다. Minecraft와 Minecraft Dungeons는 Microsoft의 상표입니다.
+> [!CAUTION]
+> 비공식 프로젝트입니다. 사용에 따른 책임은 사용자에게 있습니다. Mojang, Microsoft, Xbox와 관련이 없으며 이들의 승인이나 후원을 받지 않았습니다. Minecraft, Minecraft Dungeons를 비롯해 여기 나오는 상표, 제품명, 회사명, 로고는 각 소유자의 것입니다.
+
+> [!IMPORTANT]
 > 게임을 구매한 계정이 있어야 합니다. 라이선스 확인을 우회하지 않습니다. 소유권은 계정의 Microsoft 서명 라이선스 토큰으로 확인합니다.
 
 ## 하는 일
