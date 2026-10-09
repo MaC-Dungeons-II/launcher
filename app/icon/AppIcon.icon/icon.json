@@ -1,0 +1,118 @@
+{
+  "fill": {
+    "linear-gradient": [
+      "display-p3:0.20000,0.16000,0.42000,1.00000",
+      "display-p3:0.09000,0.06000,0.20000,1.00000"
+    ],
+    "orientation": {
+      "start": {
+        "x": 0.5,
+        "y": 0
+      },
+      "stop": {
+        "x": 0.5,
+        "y": 1
+      }
+    }
+  },
+  "groups": [
+    {
+      "name": "Portal",
+      "layers": [
+        {
+          "blend-mode": "normal",
+          "fill": {
+            "linear-gradient": [
+              "display-p3:1.00000,0.74000,0.30000,1.00000",
+              "display-p3:0.86000,0.22000,0.62000,1.00000"
+            ],
+            "orientation": {
+              "start": {
+                "x": 0.5,
+                "y": 0
+              },
+              "stop": {
+                "x": 0.5,
+                "y": 1
+              }
+            }
+          },
+          "glass": true,
+          "hidden": false,
+          "image-name": "Portal.png",
+          "name": "Portal",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "blend-mode": "normal",
+          "fill": {
+            "solid": "display-p3:1.00000,0.62000,0.20000,1.00000"
+          },
+          "glass": true,
+          "hidden": false,
+          "image-name": "Torches.png",
+          "name": "Torches",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.6
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": true,
+        "value": 0.2
+      }
+    },
+    {
+      "name": "Gate",
+      "layers": [
+        {
+          "blend-mode": "normal",
+          "fill": {
+            "solid": "display-p3:0.88000,0.87000,0.95000,1.00000"
+          },
+          "glass": true,
+          "hidden": false,
+          "image-name": "Gate.png",
+          "name": "Gate",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": true,
+        "value": 0.35
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
+      "watchOS"
+    ],
+    "squares": "shared"
+  }
+}

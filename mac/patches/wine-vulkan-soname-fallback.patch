@@ -1,0 +1,13 @@
+--- a/dlls/win32u/vulkan.c
++++ b/dlls/win32u/vulkan.c
+@@ -2993,6 +2993,10 @@
+     .p_map_instance_extensions = lazydrv_map_instance_extensions,
+     .p_map_device_extensions = lazydrv_map_device_extensions,
+ };
++
++#ifndef SONAME_LIBVULKAN
++#define SONAME_LIBVULKAN "libMoltenVK.dylib"  /* not found at build time; dlopen fails gracefully */
++#endif
+ 
+ static void vulkan_init_once(void)
+ {

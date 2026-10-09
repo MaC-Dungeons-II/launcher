@@ -1,0 +1,50 @@
+--- a/dlls/winemac.drv/cocoa_icon_utils.m
++++ b/dlls/winemac.drv/cocoa_icon_utils.m
+@@ -82,6 +82,13 @@
+     static dispatch_once_t onceToken;
+ 
+     dispatch_once(&onceToken, ^{
++        /* M(a)C Dungeons II: the launcher ships its own roundrect mask. */
++        const char *mask_path = getenv("MACD2_ICON_MASK");
++        if (mask_path && mask_path[0])
++        {
++            image = [[NSImage alloc] initWithContentsOfFile:[NSString stringWithUTF8String:mask_path]];
++            if (image) return;
++        }
+         const char *cx_root = getenv("CX_ROOT");
+         if (!cx_root || !cx_root[0])
+             return;
+@@ -140,12 +147,32 @@
+     [masked lockFocusFlipped:NO];
+     [maskImg drawInRect:fullDestRect];
+ 
++    /* M(a)C Dungeons II: small icons are pixel art; keep their edges crisp. */
++    BOOL pixelArt = icon.size.width <= 64 && getenv("MACD2_ICON_MASK");
+     [icon drawInRect:iconDestinationRect
+             fromRect:NSZeroRect
+            operation:NSCompositingOperationSourceIn
+             fraction:1.0
+       respectFlipped:YES
+-               hints:@{ NSImageHintInterpolation: @(NSImageInterpolationHigh) }];
++               hints:@{ NSImageHintInterpolation: @(pixelArt ? NSImageInterpolationNone : NSImageInterpolationHigh) }];
++    if (getenv("MACD2_ICON_MASK"))
++    {
++        /* Glass-like finish: a soft top sheen and a light rim, kept inside the mask. */
++        NSRect content = NSMakeRect(100 * scaleFactor, 100 * scaleFactor, 824 * scaleFactor, 824 * scaleFactor);
++        CGFloat radius = 185 * scaleFactor;
++        NSGradient *sheen = [[NSGradient alloc] initWithColorsAndLocations:
++            [NSColor colorWithWhite:1 alpha:0.30], 0.0,
++            [NSColor colorWithWhite:1 alpha:0.08], 0.45,
++            [NSColor colorWithWhite:1 alpha:0.0], 0.55, nil];
++        [[NSGraphicsContext currentContext] setCompositingOperation:NSCompositingOperationSourceAtop];
++        [sheen drawInRect:content angle:-90];
++        [sheen release];
++        NSBezierPath *rim = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(content, 2 * scaleFactor, 2 * scaleFactor)
++                                                            xRadius:radius yRadius:radius];
++        rim.lineWidth = 4 * scaleFactor;
++        [[NSColor colorWithWhite:1 alpha:0.35] setStroke];
++        [rim stroke];
++    }
+     [masked unlockFocus];
+ 
+     /* Now draw the roundrect with a shadow, and lay the masked icon on top. */
