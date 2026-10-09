@@ -57,7 +57,7 @@ Everything the app stores lives in `~/Library/Application Support/M(a)C Dungeons
 
 ## Install
 
-1. Download `M(a)C-Dungeons-II.zip` from [Releases](../../releases) and move the app to `/Applications`.
+1. Download `MaC-Dungeons-II.zip` from [Releases](../../releases) and move the app to `/Applications`.
 2. The app is ad-hoc signed, not notarized. The first time you open it, macOS
    blocks it. To allow it, open **System Settings → Privacy & Security** and
    click **Open Anyway**.
