@@ -8,7 +8,8 @@ Sign in with your Microsoft account and it downloads the game under your own lic
 > [!CAUTION]
 > This is an unofficial project. Use it at your own risk. It is not affiliated with, endorsed by, or sponsored by Mojang, Microsoft or Xbox. Minecraft, Minecraft Dungeons and all other trademarks, product names, and company names or logos mentioned here are the property of their respective owners.
 
-> ⚠️ **You need an account that owns the game.** The license check is not bypassed. The game checks your account's Microsoft-signed license as usual and won't run on an account that doesn't own it.
+> [!IMPORTANT]
+> **You need an account that owns the game.** The license check is not bypassed. The game checks your account's Microsoft-signed license as usual and won't run on an account that doesn't own it.
 
 The Steam edition got a Linux/Steam Deck update; the Launcher edition didn't. I made this to play my Launcher copy on a Mac.
 
@@ -72,7 +73,8 @@ Notes:
 
 ## Building
 
-> ⚠️ Built on a single M4 Mac. `mac/build-runtime.sh` is a copy of the steps actually run; it hasn't been re-run from scratch on a clean machine.
+> [!IMPORTANT]
+> Built on a single M4 Mac. `mac/build-runtime.sh` is a copy of the steps actually run; it hasn't been re-run from scratch on a clean machine.
 
 Inputs are listed at the top of `mac/build-runtime.sh`. Put them all under `~/Games/dungeons2-mac`.
 
