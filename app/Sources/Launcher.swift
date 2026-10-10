@@ -389,7 +389,7 @@ final class Launcher: ObservableObject {
 
         stage = .playing
         set("게임 실행 중", "게임을 끄면 런처도 함께 정리돼요")
-        let watchdog = Task { await self.watchGameWindows(env: env) }
+        let watchdog = Task { await self.watchGameExit(env: env) }
         defer { watchdog.cancel() }
         // xodus decrypts the encrypted executable into memory with the
         // account's license on every launch; nothing is written decrypted.
@@ -410,30 +410,42 @@ final class Launcher: ObservableObject {
     /// The title can hang during process exit after its window closes. Once a
     /// game window has been seen and then stays gone for a second, stop
     /// the Wine session so the launcher can finish.
-    private func watchGameWindows(env: [String: String]) async {
-        var seen = false
-        var goneSince: Date? = nil
+    /// The game hangs after quitting from its menu: its window stays (hidden)
+    /// and one game thread keeps the process alive. Window state is not a
+    /// reliable signal (windows stay listed after exit, and leave the screen
+    /// during fullscreen/resize), so watch the Wine process's thread count:
+    /// ~100+ while running, under 10 once the game has shut down.
+    private func watchGameExit(env: [String: String]) async {
+        let runningThreads: Int32 = 60, exitedThreads: Int32 = 12
+        var started = false
+        var lowSince: Date? = nil
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: 500_000_000)
-            let pids = Set((try? await capture("/usr/bin/pgrep", ["-f", "Dungeons-WinGDK-Shipping.exe"]))?
-                .split(separator: "\n").compactMap { Int32($0) } ?? [])
+            let pids = (try? await capture("/usr/bin/pgrep", ["-f", "Dungeons-WinGDK-Shipping.exe"]))?
+                .split(separator: "\n").compactMap { Int32($0) } ?? []
             if pids.isEmpty { return }
-            // Every window the game owns, including ones that are off screen
-            // for a moment (fullscreen/resize transitions, other Spaces).
-            // Only a destroyed window disappears from this list.
-            let windows = (CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]) ?? []
-            let visible = windows.contains { w in
-                guard let pid = w[kCGWindowOwnerPID as String] as? Int32, pids.contains(pid) else { return false }
-                return ((w[kCGWindowBounds as String] as? [String: Double])?["Width"] ?? 0) > 200
-            }
-            if visible { seen = true; goneSince = nil; continue }
-            guard seen else { continue }
-            if goneSince == nil { goneSince = Date(); continue }
-            if Date().timeIntervalSince(goneSince!) >= 1 {
+            // only Wine's own processes; `macd2 run` matches the pattern too
+            let wineDir = wine.path + "/"
+            let threads = pids.filter { executablePath($0).hasPrefix(wineDir) }.map(threadCount).max() ?? 0
+            if threads >= runningThreads { started = true; lowSince = nil; continue }
+            guard started, threads <= exitedThreads else { lowSince = nil; continue }
+            if lowSince == nil { lowSince = Date(); continue }
+            if Date().timeIntervalSince(lowSince!) >= 1 {
                 _ = await runProcess(wine.appendingPathComponent("bin/wineserver"), ["-k"], env: env, log: "game.log")
                 return
             }
         }
+    }
+
+    private func executablePath(_ pid: Int32) -> String {
+        var buf = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
+        return proc_pidpath(pid, &buf, UInt32(buf.count)) > 0 ? String(cString: buf) : ""
+    }
+
+    private func threadCount(_ pid: Int32) -> Int32 {
+        var info = proc_taskinfo()
+        let size = Int32(MemoryLayout<proc_taskinfo>.size)
+        return proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &info, size) == size ? info.pti_threadnum : 0
     }
 
     func stopHelpers() {
