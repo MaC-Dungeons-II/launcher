@@ -34,7 +34,7 @@ Tested on one machine only. A game update may break things.
 
 ## Install
 
-1. Get `MaC-Dungeons-II.zip` from [Releases](../../releases), unzip it, and move the app to `/Applications`.
+1. Get `MaC-Dungeons-II.dmg` from [Releases](../../releases), open it, and drag the app to Applications.
 2. Open the app. It isn't notarized, so macOS blocks it the first time. Go to **System Settings → Privacy & Security** and click **Open Anyway**.
 3. Sign in and wait. The first run downloads the game. After that it only checks for updates.
 
@@ -93,6 +93,7 @@ Order:
 3. Build the [mcd2-crossover fork](https://github.com/MaC-Dungeons-II/mcd2-crossover) with llvm-mingw → `xgameruntime.dll`, `XCurl.dll`
 4. `cargo build --release` in the [xodus fork](https://github.com/MaC-Dungeons-II/xodus)
 5. `app/build.sh` → app in `app/dist/`
+6. `app/dmg/make_dmg.sh` → `app/dist/MaC-Dungeons-II.dmg`
 
 To regenerate the app icon (Icon Composer format, Liquid Glass), run:
 

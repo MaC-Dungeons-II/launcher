@@ -34,7 +34,7 @@ M4 MacBook(macOS 27)에서 확인했습니다.
 
 ## 설치
 
-1. [Releases](../../releases)에서 `MaC-Dungeons-II.zip`을 받아 압축을 풀고 `/Applications`로 옮깁니다.
+1. [Releases](../../releases)에서 `MaC-Dungeons-II.dmg`를 받아 열고, 앱을 Applications로 끌어다 놓습니다.
 2. 앱을 엽니다. 공증(notarization)을 받지 않은 앱이라 처음에는 macOS가 막습니다. **시스템 설정 → 개인정보 보호 및 보안**에서 **그래도 열기**를 누릅니다.
 3. 로그인하고 기다립니다. 첫 실행 때 게임을 받고, 그다음부터는 업데이트만 확인합니다.
 
@@ -93,6 +93,7 @@ macd2          로그인, 세션 갱신, 다운로드·풀기, 실행 (xodus)
 3. [mcd2-crossover 포크](https://github.com/MaC-Dungeons-II/mcd2-crossover)를 llvm-mingw로 빌드 → `xgameruntime.dll`, `XCurl.dll`
 4. [xodus 포크](https://github.com/MaC-Dungeons-II/xodus)에서 `cargo build --release`
 5. `app/build.sh` → `app/dist/`에 앱 생성
+6. `app/dmg/make_dmg.sh` → `app/dist/MaC-Dungeons-II.dmg` 생성
 
 앱 아이콘(Icon Composer 형식, Liquid Glass)을 다시 만들려면 다음을 실행합니다.
 
