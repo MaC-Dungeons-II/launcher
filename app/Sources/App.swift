@@ -28,9 +28,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-@MainActor
-func NSApplicationTerminate() { NSApp.terminate(nil) }
-
 struct LauncherView: View {
     @EnvironmentObject var launcher: Launcher
 

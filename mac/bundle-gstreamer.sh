@@ -67,9 +67,9 @@ while [ ${#queue[@]} -gt 0 ]; do
 done
 
 # winegstreamer itself; resolve GStreamer from lib/ like winedmo does
-cp "$BUILD/dlls/winegstreamer/winegstreamer.so" "$RT/lib/wine/x86_64-unix/winegstreamer.so"
-cp "$BUILD/dlls/winegstreamer/x86_64-windows/winegstreamer.dll" "$RT/lib/wine/x86_64-windows/winegstreamer.dll"
 so="$RT/lib/wine/x86_64-unix/winegstreamer.so"
+cp "$BUILD/dlls/winegstreamer/winegstreamer.so" "$so"
+cp "$BUILD/dlls/winegstreamer/x86_64-windows/winegstreamer.dll" "$RT/lib/wine/x86_64-windows/winegstreamer.dll"
 install_name_tool -delete_rpath @loader_path/../../gstreamer "$so" 2>/dev/null || true
 otool -l "$so" | grep -q '@loader_path/../..' || install_name_tool -add_rpath @loader_path/../.. "$so"
 

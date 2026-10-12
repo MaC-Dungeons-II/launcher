@@ -4,8 +4,8 @@ Bold, flat silhouettes on a gradient fill; depth, highlights and translucency
 come from the system's glass material instead of painted detail:
   - background: night gradient fill (icon.json)
   - Gate (glass): a stepped, blocky dungeon arch with a base slab
-  - Portal (glass, front): the doorway glow, warm orange to magenta, with a
-    small pixel spark
+  - Portal (glass, front): the doorway glow, warm orange to magenta, and two
+    torch flames on the pillar faces
 Each layer is a white mask; colours are fills in icon.json, so light/dark/tinted
 appearances are handled by the system.
 
@@ -25,19 +25,22 @@ SIZE = 1024
 U = 32  # one block = 32 pt on the 1024 canvas (32 x 32 blocks)
 
 
-def mask(blocks):
-    img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+WHITE, CLEAR = (255, 255, 255, 255), (0, 0, 0, 0)
+
+
+def fill_blocks(img, blocks, fill):
     d = ImageDraw.Draw(img)
     for x0, y0, x1, y1 in blocks:  # inclusive block ranges
-        d.rectangle([x0 * U, y0 * U, (x1 + 1) * U - 1, (y1 + 1) * U - 1], fill=(255, 255, 255, 255))
+        d.rectangle([x0 * U, y0 * U, (x1 + 1) * U - 1, (y1 + 1) * U - 1], fill=fill)
     return img
+
+
+def mask(blocks):
+    return fill_blocks(Image.new("RGBA", (SIZE, SIZE), CLEAR), blocks, WHITE)
 
 
 def cut(img, blocks):
-    d = ImageDraw.Draw(img)
-    for x0, y0, x1, y1 in blocks:
-        d.rectangle([x0 * U, y0 * U, (x1 + 1) * U - 1, (y1 + 1) * U - 1], fill=(0, 0, 0, 0))
-    return img
+    return fill_blocks(img, blocks, CLEAR)
 
 
 def stepped(x0, x1, top, bottom, steps):
@@ -58,18 +61,6 @@ OPENING = stepped(11, 20, 10, 24, [(3, 1), (2, 1), (1, 1)])
 def gate():
     img = mask(stepped(7, 24, 5, 24, [(5, 1), (3, 1), (2, 1), (1, 2)]) + [(5, 24, 26, 26)])
     return cut(img, OPENING)
-
-
-# "MD" ligature carved out of the glowing doorway (block units, inclusive):
-# the M's right leg is also the D's stem, so the doorway reads as both letters.
-MONOGRAM = [
-    (12, 13, 12, 21),                      # M left leg
-    (13, 14, 13, 14), (14, 15, 14, 16),    # M valley
-    (15, 14, 15, 14),
-    (16, 13, 16, 21),                      # shared leg / D stem
-    (17, 13, 18, 13), (17, 21, 18, 21),    # D top and bottom bars
-    (19, 14, 19, 20),                      # D bowl
-]
 
 
 def portal():

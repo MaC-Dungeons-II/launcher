@@ -19,6 +19,7 @@ SRC=${SRC:-$D2/src-fd/wine}
 OUT=${OUT:-$D2/build-fd}
 MINGW=$(echo "$D2"/toolchain/llvm-mingw-*/bin)
 JOBS=$(sysctl -n hw.ncpu)
+WIDL=$OUT/tools/tools/widl/widl
 export PATH="/opt/local/bin:$MINGW:/usr/bin:/bin:/usr/sbin:/sbin"
 
 common=(--disable-tests --without-x --without-ffmpeg --without-gnutls --without-freetype --without-vulkan)
@@ -49,9 +50,9 @@ echo "== proxy xgameruntime.dll"
 R="$OUT/runtime"; rm -rf "$R"; cp -R "$FD/compat/runtime" "$R"
 for h in xasync xgameerr xgameruntimetypes xtaskqueue; do cp "$SRC/include/$h.h" "$R/include/"; done
 for h in xasyncprovider xgameruntimefeature xnetworking xsystem xuser; do
-  "$OUT/tools/tools/widl/widl" --win64 -D__WINESRC__ -h -I "$SRC/include" -o "$R/include/$h.h" "$SRC/include/$h.idl"
+  "$WIDL" --win64 -D__WINESRC__ -h -I "$SRC/include" -o "$R/include/$h.h" "$SRC/include/$h.idl"
 done
-"$OUT/tools/tools/widl/widl" --win64 -D__WINESRC__ -h -I "$SRC/include" -o "$R/include/xstore.h" "$R/idl/xstore.idl"
+"$WIDL" --win64 -D__WINESRC__ -h -I "$SRC/include" -o "$R/include/xstore.h" "$R/idl/xstore.idl"
 (cd "$R" && sed -e 's/x86_64-w64-mingw32-g++ -std=c++17 /x86_64-w64-mingw32-clang++ -std=c++17 -include type_traits /' build.sh > build-mac.sh && bash build-mac.sh >build.log 2>&1)
 cp "$R/xgameruntime.dll" "$A/"
 ls -la "$A"

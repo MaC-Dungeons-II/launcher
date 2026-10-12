@@ -11,13 +11,15 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 APP=${APP:-"$HERE/../dist/M(a)C Dungeons II.app"}
 OUT=${1:-$HERE/../dist/MaC-Dungeons-II.dmg}
 VOL="M(a)C Dungeons II"
+NAME=$(basename "$APP")
 [ -d "$APP" ] || { echo "build the app first (app/build.sh)" >&2; exit 1; }
 
 WORK=$(mktemp -d)
+MNT=
 trap 'hdiutil detach -quiet "$MNT" 2>/dev/null || true; rm -rf "$WORK"' EXIT
 STAGE="$WORK/stage"
 mkdir -p "$STAGE/.background"
-ditto "$APP" "$STAGE/$(basename "$APP")"
+ditto "$APP" "$STAGE/$NAME"
 ln -s /Applications "$STAGE/Applications"
 cp "$HERE/background.tiff" "$STAGE/.background/background.tiff"
 cp "$APP/Contents/Resources/AppIcon.icns" "$STAGE/.VolumeIcon.icns"
@@ -41,9 +43,9 @@ tell application "Finder"
         set icon size of opts to 112
         set text size of opts to 13
         set background picture of opts to file ".background:background.tiff"
-        set position of item "$(basename "$APP")" of container window to {160, 190}
+        set position of item "$NAME" of container window to {160, 190}
         set position of item "Applications" of container window to {480, 190}
-        set extension hidden of item "$(basename "$APP")" to true
+        set extension hidden of item "$NAME" to true
         update without registering applications
         delay 1
         close
