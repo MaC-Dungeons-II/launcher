@@ -3,7 +3,7 @@
 # The app ships only the compatibility layer: no game files, no Microsoft GDK
 # runtime and no curl (the launcher fetches those on first run, hash-checked).
 #
-# Inputs (D2, default ~/Games/dungeons2-mac):
+# Inputs (D2, default .work/ in this repo):
 #   runtime-cx/                     Wine (CrossOver sources, mac/build-runtime.sh) + DXMT + WineGDK builtins
 #   build-fd/runtime/xgameruntime.dll   Flightdeck proxy (mac chain patches)
 #   src-mcd2/build/{xgameruntime,XCurl}.dll  mcd2-crossover adapter + curl wrapper (patched)
@@ -11,7 +11,7 @@
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
-D2=${D2:-$HOME/Games/dungeons2-mac}
+D2=${D2:-$(cd "$HERE/.." && pwd)/.work}
 OUT=${OUT:-$HERE/dist}
 APP="$OUT/M(a)C Dungeons II.app"
 C="$APP/Contents"

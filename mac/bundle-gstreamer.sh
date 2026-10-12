@@ -4,7 +4,7 @@
 #
 # Input: the official GStreamer macOS packages (gstreamer.freedesktop.org,
 # gstreamer-1.0-<v>-universal.pkg + -devel-), expanded (not installed) into
-# $GST (default ~/Games/dungeons2-mac/src-gst/root). Wine must already be
+# $GST (default .work/src-gst/root). Wine must already be
 # configured with GSTREAMER_CFLAGS/LIBS pointing there (mac/build-runtime.sh)
 # and winegstreamer built in $BUILD.
 #
@@ -12,7 +12,7 @@
 # binaries: lib/*.dylib, lib/gstreamer-1.0/*.dylib, libexec/gstreamer-1.0/.
 set -euo pipefail
 
-D2=${D2:-$HOME/Games/dungeons2-mac}
+D2=${D2:-$(cd "$(dirname "$0")/.." && pwd)/.work}
 GST=${GST:-$D2/src-gst/root}
 BUILD=${BUILD:-$D2/build-cx/wine}
 RT=${RT:-$D2/runtime-cx}

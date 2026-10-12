@@ -76,7 +76,7 @@ Notes:
 > [!IMPORTANT]
 > Built on a single M4 Mac. `mac/build-runtime.sh` is a copy of the steps actually run; it hasn't been re-run from scratch on a clean machine.
 
-Inputs are listed at the top of `mac/build-runtime.sh`. Put them all under `~/Games/dungeons2-mac`.
+Inputs are listed at the top of `mac/build-runtime.sh`. Put them all under `.work/` in the repo (git-ignored).
 
 - CrossOver sources with `mac/patches/` applied
 - llvm-mingw

@@ -13,7 +13,7 @@
 #   $SRC   Sightem/WineGDK b5d23b0 with compat/patches/winegdk-runtime.patch applied
 set -euo pipefail
 
-D2=${D2:-$HOME/Games/dungeons2-mac}
+D2=${D2:-$(cd "$(dirname "$0")/.." && pwd)/.work}
 FD=${FD:?Flightdeck checkout}
 SRC=${SRC:-$D2/src-fd/wine}
 OUT=${OUT:-$D2/build-fd}

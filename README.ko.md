@@ -76,7 +76,7 @@ macd2          로그인, 세션 갱신, 다운로드·풀기, 실행 (xodus)
 > [!IMPORTANT]
 > M4 Mac 한 대에서 빌드했습니다. `mac/build-runtime.sh`는 실제로 실행한 단계를 그대로 옮긴 것이고, 깨끗한 환경에서 처음부터 다시 돌려 보지는 않았습니다.
 
-준비물은 `mac/build-runtime.sh` 머리말에 있습니다. 모두 `~/Games/dungeons2-mac` 아래에 둡니다.
+준비물은 `mac/build-runtime.sh` 머리말에 있습니다. 모두 저장소 안의 `.work/`에 둡니다(git에서 제외됨).
 
 - `mac/patches/`를 적용한 CrossOver 소스
 - llvm-mingw

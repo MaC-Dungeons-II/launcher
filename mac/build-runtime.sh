@@ -8,7 +8,7 @@
 #   1. tools/  Wine's build tools (widl, winebuild, ...) as native arm64
 #   2. wine/   Wine itself for x86_64-apple-darwin, using those tools
 #
-# Inputs under $D2 (default ~/Games/dungeons2-mac):
+# Inputs under $D2 (default .work/ in this repo, git-ignored):
 #   src-cx/wine         CodeWeavers crossover-sources 26.3.0, wine/ directory
 #                       (https://media.codeweavers.com/pub/crossover/source/)
 #                       with mac/patches/wine-*.patch and winemac-*.patch applied
@@ -31,7 +31,7 @@
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
-D2=${D2:-$HOME/Games/dungeons2-mac}
+D2=${D2:-$(cd "$HERE/.." && pwd)/.work}
 SRC=${SRC:-$D2/src-cx/wine}
 OUT=${OUT:-$D2/build-cx}
 RT=${RT:-$D2/runtime-cx}
