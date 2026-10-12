@@ -65,6 +65,8 @@ macd2          로그인, 세션 갱신, 다운로드·풀기, 실행 (xodus)
 - GStreamer — 게임 영상(H.264) 재생
 - SDL — 컨트롤러 입력
 
+계층별 자세한 설명은 [docs/architecture.ko.md](docs/architecture.ko.md)에 있습니다.
+
 참고:
 
 - 게임 실행 파일은 디스크에 암호화된 상태로 둡니다. 실행할 때 RAM 디스크에만 풀어서 씁니다.

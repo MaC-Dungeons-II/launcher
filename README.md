@@ -65,6 +65,8 @@ macd2          sign-in, session refresh, download/extract, launch (xodus)
 - GStreamer — game videos (H.264)
 - SDL — controller input
 
+Details per layer: [docs/architecture.md](docs/architecture.md).
+
 Notes:
 
 - The game's executables stay encrypted on disk. At launch they're decrypted into a RAM disk only.
