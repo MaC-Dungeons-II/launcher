@@ -36,13 +36,26 @@ SRC=${SRC:-$D2/src-cx/wine}
 OUT=${OUT:-$D2/build-cx}
 RT=${RT:-$D2/runtime-cx}
 HOSTLIBS=$D2/toolchain/hostlibs/x86_64
-MINGW=$(echo "$D2"/toolchain/llvm-mingw-*/bin)
 FFMPEG=$D2/ffmpeg-x64
 GST=$D2/src-gst/root
 SDL=$D2/sdl-x64
 DXMT=$D2/dxmt/68af85e96196e1cf9f50de9fe24c70f03a1db4a7
 JOBS=$(sysctl -n hw.ncpu)
-export PATH="/opt/local/bin:$MINGW:/usr/bin:/bin:/usr/sbin:/sbin"
+export PATH="/opt/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+# Exactly one toolchain/llvm-mingw-* directory (only the Wine build needs it).
+require_mingw() {
+    local dirs=("$D2"/toolchain/llvm-mingw-*/)
+    if [ ! -d "${dirs[0]}" ]; then
+        echo "error: no llvm-mingw toolchain: $D2/toolchain/llvm-mingw-*" >&2; exit 1
+    fi
+    if [ ${#dirs[@]} -ne 1 ]; then
+        echo "error: more than one llvm-mingw toolchain, keep one:" >&2
+        printf '  %s\n' "${dirs[@]}" >&2; exit 1
+    fi
+    MINGW=${dirs[0]}bin
+    export PATH="/opt/local/bin:$MINGW:/usr/bin:/bin:/usr/sbin:/sbin"
+}
 
 # FFmpeg 7.1.1 (ffmpeg.org), decoders/demuxers for the game's mp4 videos only.
 # LGPL: no --enable-gpl / --enable-nonfree.
@@ -72,6 +85,7 @@ build_sdl() {
 }
 
 build_wine() {
+    require_mingw
     local common=(--disable-tests --without-x --disable-wineopenxr --disable-amd_ags_x64)
 
     echo "== tools (arm64)"
@@ -97,7 +111,11 @@ build_wine() {
         SDL2_CFLAGS="-I$SDL/include/SDL2" SDL2_LIBS="-L$SDL/lib -lSDL2" \
         CFLAGS="-O2" LDFLAGS="-L$HOSTLIBS" \
         >configure.log 2>&1
-    grep -E "SONAME_LIB(GNUTLS|FREETYPE|SDL2)" include/config.h
+    local soname
+    for soname in SONAME_LIBGNUTLS SONAME_LIBFREETYPE SONAME_LIBSDL2; do
+        grep -E "^#define $soname " include/config.h ||
+            { echo "error: $soname not found by configure (see $OUT/wine/configure.log)" >&2; exit 1; }
+    done
     make -j"$JOBS" >make.log 2>&1
     make install >install.log 2>&1
 }
@@ -105,7 +123,9 @@ build_wine() {
 assemble() {
     local unix=$RT/lib/wine/x86_64-unix pe=$RT/lib/wine/x86_64-windows
     echo "== host libraries"
-    cp -n "$HOSTLIBS"/*.dylib "$RT/lib/" 2>/dev/null || true
+    local hostlibs=("$HOSTLIBS"/*.dylib)
+    [ -f "${hostlibs[0]}" ] || { echo "error: no host libraries in $HOSTLIBS" >&2; exit 1; }
+    cp -f "${hostlibs[@]}" "$RT/lib/"   # replaces stale copies; fails on a missing file
     cp "$FFMPEG"/lib/lib{avformat.61,avcodec.61,avutil.59,swresample.5}.dylib "$RT/lib/"
     cp "$SDL/lib/libSDL2-2.0.0.dylib" "$RT/lib/"
     # bundle-gstreamer.sh later replaces these with the GStreamer build of

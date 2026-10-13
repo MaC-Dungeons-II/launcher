@@ -17,7 +17,15 @@ D2=${D2:-$(cd "$(dirname "$0")/.." && pwd)/.work}
 FD=${FD:?Flightdeck checkout}
 SRC=${SRC:-$D2/src-fd/wine}
 OUT=${OUT:-$D2/build-fd}
-MINGW=$(echo "$D2"/toolchain/llvm-mingw-*/bin)
+MINGW_DIRS=("$D2"/toolchain/llvm-mingw-*/)
+if [ ! -d "${MINGW_DIRS[0]}" ]; then
+  echo "error: no llvm-mingw toolchain: $D2/toolchain/llvm-mingw-*" >&2; exit 1
+fi
+if [ ${#MINGW_DIRS[@]} -ne 1 ]; then
+  echo "error: more than one llvm-mingw toolchain, keep one:" >&2
+  printf '  %s\n' "${MINGW_DIRS[@]}" >&2; exit 1
+fi
+MINGW=${MINGW_DIRS[0]}bin
 JOBS=$(sysctl -n hw.ncpu)
 WIDL=$OUT/tools/tools/widl/widl
 export PATH="/opt/local/bin:$MINGW:/usr/bin:/bin:/usr/sbin:/sbin"

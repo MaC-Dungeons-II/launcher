@@ -39,10 +39,21 @@ final class Launcher: ObservableObject {
     var stateFile: URL { data.appendingPathComponent("state.json") }
     var licenseMarker: URL { data.appendingPathComponent("gdk-license-accepted") }
     var gameBinaries: URL { game.appendingPathComponent("Dungeons/Binaries/WinGDK") }
+    var gameOld: URL { data.appendingPathComponent("game.old") }
+    var lockFile: URL { data.appendingPathComponent(".lock") }
+    var brokerPidFile: URL { data.appendingPathComponent("broker.pid") }
+    var sessionPidFile: URL { data.appendingPathComponent("session-serve.pid") }
+    static let brokerSocket = "/tmp/macd2.sock"
+    static let rotatedLogs = ["game.log", "fetch.log", "broker.log", "session.log", "prefix.log"]
 
     private var helpers: [Process] = []
     private var lastSample: (Date, Double)? = nil
     private var speed: Double = 0
+    private var fetchErrorStage: String? = nil
+    private var lockFD: Int32 = -1
+    private var prepared = false
+    /// Wine may be running (prefix setup or the game); quitting must stop it.
+    private var usedWine = false
 
     // MARK: - Flow
 
@@ -51,7 +62,12 @@ final class Launcher: ObservableObject {
     }
 
     func acceptLicense() {
-        try? Data("accepted \(Date())\n".utf8).write(to: licenseMarker)
+        do {
+            try Data("accepted \(Date())\n".utf8).write(to: licenseMarker, options: .atomic)
+        } catch {
+            fail("라이선스 동의를 저장하지 못했어요. \(error.localizedDescription)")
+            return
+        }
         start()
     }
 
@@ -74,13 +90,33 @@ final class Launcher: ObservableObject {
         do {
             try fm.createDirectory(at: data, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             for dir in [deps, session, logs] { try fm.createDirectory(at: dir, withIntermediateDirectories: true) }
+            guard try acquireLock() else {
+                stage = .failed
+                set("이미 실행 중이에요.", "다른 M(a)C Dungeons II 창을 닫고 다시 시도해 주세요.")
+                return
+            }
+            if !prepared {
+                // once per app launch, before anything touches the game or helpers
+                try restoreGameFolder()
+                rotateLogs()
+                await stopStaleHelpers()
+                prepared = true
+            }
 
             set("Microsoft 계정 확인 중…")
-            let sessionCode = await runProcess(cli, ["mac-session", session.path], log: "session.log")
-            if sessionCode != 0 {
+            let check = await execute(cli, ["mac-session", session.path], log: "session.log", timeout: 60)
+            if check.timedOut || check.code == 69 {
+                failOffline()
+                return
+            }
+            if check.code == 77 {
                 stage = .needsLogin
                 set("Microsoft 계정으로 로그인해 주세요",
                     "게임을 구매한 계정으로 로그인하면, 게임을 내려받고 실행할 수 있어요.")
+                return
+            }
+            if check.code != 0 {
+                fail("Microsoft 계정을 확인하지 못했어요 (코드 \(check.code)).")
                 return
             }
 
@@ -95,6 +131,8 @@ final class Launcher: ObservableObject {
             try overlayLayer()
             try await ensurePrefix()
             try await launch()
+        } catch is OfflineError {
+            failOffline()
         } catch {
             fail(error.localizedDescription)
         }
@@ -107,6 +145,81 @@ final class Launcher: ObservableObject {
     private func fail(_ message: String) {
         stage = .failed
         set("문제가 생겼어요", message + "\n로그: \(logs.path)")
+    }
+
+    private func failOffline() {
+        stage = .failed
+        set("인터넷 연결을 확인해 주세요.", "연결된 뒤 다시 시도해 주세요.")
+    }
+
+    // MARK: - Single instance and leftovers from a previous run
+
+    /// Exclusive lock on <data>/.lock for the app's lifetime (released by the
+    /// kernel when the process exits, also on a crash).
+    private func acquireLock() throws -> Bool {
+        if lockFD >= 0 { return true }
+        let fd = open(lockFile.path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+        guard fd >= 0 else {
+            throw LauncherError("잠금 파일을 만들지 못했어요: \(String(cString: strerror(errno)))")
+        }
+        if flock(fd, LOCK_EX | LOCK_NB) != 0 {
+            close(fd)
+            return false
+        }
+        lockFD = fd
+        return true
+    }
+
+    /// A game-folder swap that was interrupted leaves only game.old; put it back.
+    /// With both present, the swap finished and game.old is a leftover.
+    private func restoreGameFolder() throws {
+        guard fm.fileExists(atPath: gameOld.path) else { return }
+        if fm.fileExists(atPath: game.path) {
+            try? fm.removeItem(at: gameOld)
+        } else {
+            try fm.moveItem(at: gameOld, to: game)
+        }
+    }
+
+    /// Keeps one previous copy of each log (<name>.1).
+    private func rotateLogs() {
+        for name in Self.rotatedLogs {
+            let log = logs.appendingPathComponent(name)
+            guard fm.fileExists(atPath: log.path) else { continue }
+            let previous = logs.appendingPathComponent(name + ".1")
+            try? fm.removeItem(at: previous)
+            try? fm.moveItem(at: log, to: previous)
+        }
+    }
+
+    /// Stops helpers recorded by an earlier run (quit or crash) whose PID still
+    /// belongs to the expected executable.
+    private func stopStaleHelpers() async {
+        for (file, exe) in [(brokerPidFile, broker), (sessionPidFile, cli)] {
+            defer { try? fm.removeItem(at: file) }
+            guard let text = try? String(contentsOf: file, encoding: .utf8),
+                  let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)), pid > 0,
+                  isHelper(pid, exe) else { continue }
+            kill(pid, SIGTERM)
+            for _ in 0..<30 where isHelper(pid, exe) {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            if isHelper(pid, exe) { kill(pid, SIGKILL) }
+        }
+    }
+
+    /// The running process `pid` is this app's `exe` (same file, or the same
+    /// helper in another copy of the app, e.g. a translocated one).
+    private func isHelper(_ pid: Int32, _ exe: URL) -> Bool {
+        let path = Self.realPath(executablePath(pid))
+        if path.isEmpty { return false }
+        if path == Self.realPath(exe.path) { return true }
+        return (path as NSString).lastPathComponent == exe.lastPathComponent
+            && path.contains(".app/Contents/Resources/bin/")
+    }
+
+    private func writePid(_ p: Process, to file: URL) {
+        try? Data("\(p.processIdentifier)\n".utf8).write(to: file, options: .atomic)
     }
 
     // MARK: - Microsoft GDK runtime and curl (fetched, never bundled)
@@ -148,6 +261,7 @@ final class Launcher: ObservableObject {
             set("런타임 내려받는 중… (\(name))", "출처: \(source.host ?? "")", 0)
             let archive = deps.appendingPathComponent(name)
             try await download(source, to: archive)
+            defer { try? fm.removeItem(at: archive) }   // also when a hash did not match
             let entries = try await capture("/usr/bin/zipinfo", ["-1", archive.path])
                 .split(separator: "\n").map(String.init)
             for member in dep.members {
@@ -163,13 +277,15 @@ final class Launcher: ObservableObject {
                     throw LauncherError("\(member.name) 해시가 맞지 않아요. 내려받은 파일을 사용하지 않았어요.")
                 }
             }
-            try? fm.removeItem(at: archive)
         }
     }
 
     private func download(_ url: URL, to target: URL) async throws {
         let (temp, response) = try await URLSession.shared.download(from: url, delegate: nil)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw LauncherError("내려받기 실패: \(url.absoluteString)") }
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+            try? fm.removeItem(at: temp)
+            throw LauncherError("내려받기 실패: \(url.absoluteString)")
+        }
         try? fm.removeItem(at: target)
         try fm.moveItem(at: temp, to: target)
     }
@@ -185,11 +301,14 @@ final class Launcher: ObservableObject {
     private func ensureGame() async throws {
         set("업데이트 확인 중…")
         let installed = installedVersion()
-        let info = try await capture(cli.path, ["package-info", Self.productId])
-        guard let line = info.split(separator: "\n").last(where: { $0.hasPrefix("{") }),
-              let json = try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+        let info = await execute(cli, ["package-info", Self.productId], log: "tools.log", captureOutput: true, timeout: 120)
+        let text = String(decoding: info.output, as: UTF8.self)
+        guard info.code == 0, !info.timedOut,
+              let line = text.split(separator: "\n").last(where: { $0.hasPrefix("{") }),
+              let json = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
               let latest = json["version"] as? String else {
-            if installed != nil && fm.fileExists(atPath: gameBinaries.path) { return } // offline: play installed copy
+            // offline or service trouble: play the installed copy
+            if fm.fileExists(atPath: gameBinaries.appendingPathComponent(Self.gameExe).path) { return }
             throw LauncherError("게임 버전 정보를 받지 못했어요. 인터넷 연결을 확인해 주세요.")
         }
         if installed == latest && fm.fileExists(atPath: gameBinaries.appendingPathComponent(Self.gameExe).path) {
@@ -200,19 +319,34 @@ final class Launcher: ObservableObject {
         set(installed == nil ? "게임 내려받는 중…" : "업데이트 내려받는 중… (\(latest))", "Microsoft에서 \(latest) 버전을 받고 있어요", 0)
         var fetchEnv = ProcessInfo.processInfo.environment
         fetchEnv["MACD2_PROGRESS_JSON"] = "1"
+        speed = 0
+        lastSample = nil
+        fetchErrorStage = nil
         let code = await runProcess(cli, ["mac-fetch", Self.productId, data.appendingPathComponent("downloads").path, staging.path],
                                     env: fetchEnv, log: "fetch.log", onLine: { [weak self] line in self?.fetchProgress(line) })
-        guard code == 0 else { throw LauncherError("게임을 내려받지 못했어요 (코드 \(code)). 다시 실행하면 이어서 받아요.") }
+        guard code == 0 else {
+            switch fetchErrorStage {
+            case "disk-full": throw LauncherError("저장 공간이 부족해요. 약 20GB가 필요해요.")
+            case "network": throw OfflineError()
+            case "busy": throw LauncherError("다른 내려받기가 진행 중이에요. 잠시 후 다시 시도해 주세요.")
+            default: throw LauncherError("게임을 내려받지 못했어요 (코드 \(code)). 다시 실행하면 이어서 받아요.")
+            }
+        }
         if fm.fileExists(atPath: game.path) {
-            let old = data.appendingPathComponent("game.old")
-            try? fm.removeItem(at: old)
-            try fm.moveItem(at: game, to: old)
-            try fm.moveItem(at: staging, to: game)
-            try? fm.removeItem(at: old)
+            // If the app dies between the two moves, startup restores game.old.
+            try? fm.removeItem(at: gameOld)
+            try fm.moveItem(at: game, to: gameOld)
+            do {
+                try fm.moveItem(at: staging, to: game)
+            } catch {
+                try? fm.moveItem(at: gameOld, to: game)
+                throw error
+            }
+            try? fm.removeItem(at: gameOld)
         } else {
             try fm.moveItem(at: staging, to: game)
         }
-        try JSONSerialization.data(withJSONObject: ["version": latest]).write(to: stateFile)
+        try JSONSerialization.data(withJSONObject: ["version": latest]).write(to: stateFile, options: .atomic)
     }
 
     private func fetchProgress(_ line: String) {
@@ -220,19 +354,24 @@ final class Launcher: ObservableObject {
         switch j["phase"] as? String {
         case "download":
             if let done = j["done"] as? Double, let total = j["total"] as? Double, total > 0 {
-                progress = done / total
+                progress = min(max(done / total, 0), 1)
                 let now = Date()
-                if let (t0, d0) = lastSample, now.timeIntervalSince(t0) >= 1 {
-                    let rate = (done - d0) / now.timeIntervalSince(t0)
-                    speed = speed == 0 ? rate : speed * 0.8 + rate * 0.2   // smoothed bytes/s
-                    lastSample = (now, done)
-                } else if lastSample == nil {
+                if let (t0, d0) = lastSample {
+                    let dt = now.timeIntervalSince(t0)
+                    if dt >= 1 {
+                        let rate = (done - d0) / dt
+                        // a negative rate means bytes were rolled back: not a speed sample
+                        if rate >= 0 { speed = speed == 0 ? rate : speed * 0.8 + rate * 0.2 }   // smoothed bytes/s
+                        lastSample = (now, done)
+                    }
+                } else {
                     lastSample = (now, done)
                 }
                 var text = String(format: "%.1f / %.1f GB", done / 1e9, total / 1e9)
-                if speed > 0 {
+                if speed > 100_000 {   // below ~100 KB/s the estimate is meaningless
                     text += String(format: " · %.1f MB/s", speed / 1e6)
-                    let left = Int((total - done) / speed)
+                    let seconds = max(total - done, 0) / speed
+                    let left = seconds.isFinite ? Int(min(seconds, 99 * 3600)) : 99 * 3600
                     text += left >= 60 ? " · 약 \(left / 60)분 남음" : " · 1분 이내"
                 }
                 detail = text
@@ -245,6 +384,8 @@ final class Launcher: ObservableObject {
             } else {
                 detail = "계정 라이선스로 패키지를 풀고 있어요"; progress = nil
             }
+        case "error":
+            fetchErrorStage = j["stage"] as? String
         default: break
         }
     }
@@ -310,6 +451,7 @@ final class Launcher: ObservableObject {
     private func ensurePrefix() async throws {
         let marker = prefix.appendingPathComponent(".macd2-ready")
         let isNew = !fm.fileExists(atPath: marker.path)
+        usedWine = true
         if isNew { try await createPrefix() }
         syncBuiltins()
         await configureControllers()
@@ -319,10 +461,12 @@ final class Launcher: ObservableObject {
 
     private func createPrefix() async throws {
         set("처음 실행 준비 중… (Windows 환경 만들기)", "1~2분 걸려요")
-        await prefixWine(["wineboot", "-i"])
+        let boot = await prefixWine(["wineboot", "-i"])
         await runProcess(wineServer, ["-w"], env: wineEnv, log: "prefix.log")
-        await prefixWine(["winecfg", "/v", "win11"])
+        guard boot == 0 else { throw LauncherError("Windows 환경을 만들지 못했어요 (wineboot 코드 \(boot)).") }
+        let cfg = await prefixWine(["winecfg", "/v", "win11"])
         await runProcess(wineServer, ["-w"], env: wineEnv, log: "prefix.log")
+        guard cfg == 0 else { throw LauncherError("Windows 환경을 만들지 못했어요 (winecfg 코드 \(cfg)).") }
         try replace(system32.appendingPathComponent("curl-ca-bundle.crt"), with: caBundle)
         try fm.createDirectory(at: prefix.appendingPathComponent("drive_c/gamesave"), withIntermediateDirectories: true)
     }
@@ -383,20 +527,38 @@ final class Launcher: ObservableObject {
         env["MACD2_VIEW"] = "1"   // decrypted executables live only in a RAM-disk view of the game
         env["MACD2_ICON_MASK"] = resources.appendingPathComponent("dock-mask.png").path  // rounded Dock icon
 
-        await runProcess(URL(fileURLWithPath: "/usr/bin/pkill"), ["-f", broker.path], log: "broker.log")
-        try? fm.removeItem(atPath: "/tmp/macd2.sock")
+        await stopStaleHelpers()
+        do {
+            try fm.removeItem(atPath: Self.brokerSocket)
+        } catch let e as CocoaError where e.code == .fileNoSuchFile {
+        } catch {
+            throw LauncherError("\(Self.brokerSocket)을 지우지 못했어요. \(error.localizedDescription)")
+        }
         var brokerEnv = ProcessInfo.processInfo.environment
         brokerEnv["MACD2_SOCKET"] = "macd2.sock"
-        helpers = [
-            spawn(broker, [], env: brokerEnv, log: "broker.log"),
-            spawn(cli, ["mac-session", session.path, "--serve"], env: nil, log: "session.log"),
-        ].compactMap { $0 }
-        try await Task.sleep(nanoseconds: 1_500_000_000)
+        guard let brokerProcess = spawn(broker, [], env: brokerEnv, log: "broker.log") else {
+            throw LauncherError("라이선스 도우미(macd2-broker)를 시작하지 못했어요.")
+        }
+        helpers.append(brokerProcess)
+        writePid(brokerProcess, to: brokerPidFile)
+        if let serve = spawn(cli, ["mac-session", session.path, "--serve"], env: nil, log: "session.log") {
+            helpers.append(serve)
+            writePid(serve, to: sessionPidFile)
+        }
+        // wait until the broker accepts connections (up to ~10 s)
+        let deadline = Date().addingTimeInterval(10)
+        while !Self.socketAccepts(Self.brokerSocket) {
+            if !brokerProcess.isRunning || Date() > deadline {
+                stopHelpers()
+                throw LauncherError("라이선스 도우미(macd2-broker)가 응답하지 않아요.")
+            }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
 
         stage = .playing
         set("게임 실행 중", "게임을 끄면 런처도 함께 정리돼요")
+        usedWine = true
         let watchdog = Task { await self.watchGameExit(env: env) }
-        defer { watchdog.cancel() }
         // xodus decrypts the encrypted executable into memory with the
         // account's license on every launch; nothing is written decrypted.
         let code = await runProcess(cli,
@@ -404,9 +566,13 @@ final class Launcher: ObservableObject {
                                      "--exe", "\\Dungeons\\Binaries\\WinGDK\\\(Self.gameExe)",
                                      "--", "-dx11"],
                                     env: env, cwd: gameBinaries, log: "game.log")
+        watchdog.cancel()
+        let stoppedByWatchdog = await watchdog.value
         await killWineServer(env: env, log: "game.log")
+        usedWine = false
         stopHelpers()
-        if code != 0 && code != 1 {
+        // After the watchdog's `wineserver -k` the exit status is not an error.
+        if code != 0 && code != 1 && !stoppedByWatchdog {
             fail("게임이 비정상 종료됐어요 (코드 \(code)).")
         } else {
             NSApp.terminate(nil)
@@ -419,26 +585,32 @@ final class Launcher: ObservableObject {
     /// during fullscreen/resize), so watch the Wine process's thread count:
     /// ~100+ while running, under 10 once the game has shut down. Once it has
     /// run and then stays low for a second, stop the Wine session.
-    private func watchGameExit(env: [String: String]) async {
+    /// Returns true when it stopped the Wine session itself.
+    private func watchGameExit(env: [String: String]) async -> Bool {
         let runningThreads: Int32 = 60, exitedThreads: Int32 = 12
-        // only Wine's own processes; `macd2 run` matches the pattern too
-        let wineDir = wine.path + "/"
+        // only Wine's own processes; `macd2 run` matches the pattern too.
+        // Both sides resolved: app translocation, /var -> /private/var.
+        let wineDir = Self.realPath(wine.path) + "/"
         var started = false
         var lowSince: Date? = nil
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: 500_000_000)
-            let pids = (try? await capture("/usr/bin/pgrep", ["-f", Self.gameExe]))?
-                .split(separator: "\n").compactMap { Int32($0) } ?? []
-            if pids.isEmpty { return }
-            let threads = pids.filter { executablePath($0).hasPrefix(wineDir) }.map(threadCount).max() ?? 0
+            if Task.isCancelled { break }
+            let found = await execute(URL(fileURLWithPath: "/usr/bin/pgrep"), ["-f", Self.gameExe],
+                                      log: "tools.log", captureOutput: true)
+            let pids = String(decoding: found.output, as: UTF8.self)
+                .split(separator: "\n").compactMap { Int32($0) }
+            if pids.isEmpty { return false }
+            let threads = pids.filter { Self.realPath(executablePath($0)).hasPrefix(wineDir) }.map(threadCount).max() ?? 0
             if threads >= runningThreads { started = true; lowSince = nil; continue }
             guard started, threads <= exitedThreads else { lowSince = nil; continue }
             guard let since = lowSince else { lowSince = Date(); continue }
             if Date().timeIntervalSince(since) >= 1 {
                 await killWineServer(env: env, log: "game.log")
-                return
+                return true
             }
         }
+        return false
     }
 
     private func executablePath(_ pid: Int32) -> String {
@@ -455,6 +627,53 @@ final class Launcher: ObservableObject {
     func stopHelpers() {
         for p in helpers where p.isRunning { p.terminate() }
         helpers.removeAll()
+        try? fm.removeItem(at: brokerPidFile)
+        try? fm.removeItem(at: sessionPidFile)
+    }
+
+    /// App is quitting: stop Wine (if it may be running) before its helpers,
+    /// then every remaining child process.
+    func shutdown() {
+        if usedWine {
+            let p = makeProcess(wineServer, ["-k"], env: wineEnv)
+            let h = logHandle("game.log") ?? FileHandle.nullDevice
+            p.standardOutput = h
+            p.standardError = h
+            if (try? p.run()) != nil {
+                let deadline = Date().addingTimeInterval(5)
+                while p.isRunning && Date() < deadline { usleep(50_000) }
+                if p.isRunning { p.terminate() }
+            }
+            usedWine = false
+        }
+        stopHelpers()
+        ChildProcesses.shared.terminateAll()
+    }
+
+    nonisolated static func realPath(_ path: String) -> String {
+        guard !path.isEmpty, let resolved = realpath(path, nil) else { return path }
+        defer { free(resolved) }
+        return String(cString: resolved)
+    }
+
+    /// True when a Unix socket at `path` accepts a connection.
+    nonisolated static func socketAccepts(_ path: String) -> Bool {
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+        var addr = sockaddr_un()
+        addr.sun_family = sa_family_t(AF_UNIX)
+        let bytes = Array(path.utf8)
+        guard bytes.count < MemoryLayout.size(ofValue: addr.sun_path) else { return false }
+        withUnsafeMutableBytes(of: &addr.sun_path) { raw in
+            raw.copyBytes(from: bytes)
+            raw[bytes.count] = 0
+        }
+        let len = socklen_t(MemoryLayout<sockaddr_un>.size)
+        addr.sun_len = UInt8(len)
+        return withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, len) }
+        } == 0
     }
 
     // MARK: - Process helpers
@@ -478,52 +697,45 @@ final class Launcher: ObservableObject {
 
     private func spawn(_ exe: URL, _ args: [String], env: [String: String]?, log: String) -> Process? {
         let p = makeProcess(exe, args, env: env)
-        let h = logHandle(log)
+        let h = logHandle(log) ?? FileHandle.nullDevice
         p.standardOutput = h
         p.standardError = h
-        do { try p.run(); return p } catch { return nil }
+        p.terminationHandler = { ChildProcesses.shared.remove($0) }
+        ChildProcesses.shared.add(p)
+        do { try p.run(); return p } catch { ChildProcesses.shared.remove(p); return nil }
     }
 
     /// Runs a process to completion, appending stderr (and stdout) to the
     /// named log. With `onLine`, stdout is also delivered line by line.
     @discardableResult
     private func runProcess(_ exe: URL, _ args: [String], env: [String: String]? = nil, cwd: URL? = nil,
-                            log: String, onLine: (@MainActor (String) -> Void)? = nil) async -> Int32 {
+                            log: String, onLine: (@MainActor @Sendable (String) -> Void)? = nil) async -> Int32 {
+        await execute(exe, args, env: env, cwd: cwd, log: log, onLine: onLine).code
+    }
+
+    /// Runs a process without blocking the main actor. stderr goes to the log;
+    /// stdout goes to the log, or through a pipe that is read off the main
+    /// thread (`captureOutput` keeps it, `onLine` gets each line on the main
+    /// actor). Returns after both the exit and the end of stdout, so no line
+    /// arrives after the caller moved on. `timeout` terminates the process.
+    private func execute(_ exe: URL, _ args: [String], env: [String: String]? = nil, cwd: URL? = nil,
+                         log: String, captureOutput: Bool = false, timeout: TimeInterval? = nil,
+                         onLine: (@MainActor @Sendable (String) -> Void)? = nil) async -> ProcessResult {
         let p = makeProcess(exe, args, env: env, cwd: cwd)
         let h = logHandle(log)
-        p.standardError = h
-        if let onLine {
-            let pipe = Pipe()
-            p.standardOutput = pipe
-            let buffer = LineBuffer()
-            pipe.fileHandleForReading.readabilityHandler = { handle in
-                let chunk = handle.availableData
-                if chunk.isEmpty { return }
-                h?.write(chunk)
-                for line in buffer.append(chunk) {
-                    Task { @MainActor in onLine(line) }
-                }
-            }
-        } else {
-            p.standardOutput = h
-        }
-        return await withCheckedContinuation { cont in
-            p.terminationHandler = { proc in cont.resume(returning: proc.terminationStatus) }
-            do { try p.run() } catch { cont.resume(returning: -1) }
-        }
+        p.standardError = h ?? FileHandle.nullDevice
+        let pipe: Pipe? = (captureOutput || onLine != nil) ? Pipe() : nil
+        p.standardOutput = pipe ?? h ?? FileHandle.nullDevice
+        let run = ChildRun(process: p, pipe: pipe, copyTo: onLine != nil ? h : nil,
+                           keepOutput: captureOutput, onLine: onLine)
+        return await withCheckedContinuation { cont in run.start(timeout: timeout, cont) }
     }
 
     private func captureData(_ exe: String, _ args: [String]) async throws -> Data {
         let tool = URL(fileURLWithPath: exe)
-        let p = makeProcess(tool, args)
-        let pipe = Pipe()
-        p.standardOutput = pipe
-        p.standardError = logHandle("tools.log")
-        try p.run()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        p.waitUntilExit()
-        guard p.terminationStatus == 0 else { throw LauncherError("\(tool.lastPathComponent) 실패") }
-        return data
+        let result = await execute(tool, args, log: "tools.log", captureOutput: true)
+        guard result.code == 0 else { throw LauncherError("\(tool.lastPathComponent) 실패") }
+        return result.output
     }
 
     private func capture(_ exe: String, _ args: [String]) async throws -> String {
@@ -534,6 +746,9 @@ final class Launcher: ObservableObject {
         SHA256.hash(data: try Data(contentsOf: url)).map { String(format: "%02x", $0) }.joined()
     }
 }
+
+/// Network or service unavailable: shown as "check your connection" with retry.
+struct OfflineError: Error {}
 
 struct LauncherError: LocalizedError {
     let message: String
@@ -552,5 +767,132 @@ final class LineBuffer: @unchecked Sendable {
             data.removeSubrange(data.startIndex...nl)
         }
         return lines
+    }
+    /// The unterminated rest of the stream, if any.
+    func flush() -> String? {
+        defer { data.removeAll() }
+        return data.isEmpty ? nil : String(decoding: data, as: UTF8.self)
+    }
+}
+
+struct ProcessResult: Sendable {
+    var code: Int32
+    var output: Data
+    var timedOut: Bool
+}
+
+/// Every child process the launcher starts, so quitting can stop them all.
+final class ChildProcesses: @unchecked Sendable {
+    static let shared = ChildProcesses()
+    private let lock = NSLock()
+    private var running: [ObjectIdentifier: Process] = [:]
+
+    func add(_ p: Process) { lock.withLock { running[ObjectIdentifier(p)] = p } }
+    func remove(_ p: Process) { lock.withLock { running[ObjectIdentifier(p)] = nil } }
+    func terminateAll() {
+        let all = lock.withLock { Array(running.values) }
+        for p in all where p.isRunning { p.terminate() }
+    }
+}
+
+/// One child run: waits for both the exit and EOF on stdout, then resumes the
+/// caller on the main queue, after every line it already delivered there.
+final class ChildRun: @unchecked Sendable {
+    private let lock = NSLock()
+    private let process: Process
+    private let pipe: Pipe?
+    private let copyTo: FileHandle?
+    private let keepOutput: Bool
+    private let onLine: (@MainActor @Sendable (String) -> Void)?
+    private let lines = LineBuffer()
+    private var cont: CheckedContinuation<ProcessResult, Never>?
+    private var output = Data()
+    private var exited = false, eof = false, timedOut = false
+    private var status: Int32 = -1
+
+    init(process: Process, pipe: Pipe?, copyTo: FileHandle?, keepOutput: Bool,
+         onLine: (@MainActor @Sendable (String) -> Void)?) {
+        self.process = process
+        self.pipe = pipe
+        self.copyTo = copyTo
+        self.keepOutput = keepOutput
+        self.onLine = onLine
+    }
+
+    func start(timeout: TimeInterval?, _ cont: CheckedContinuation<ProcessResult, Never>) {
+        self.cont = cont
+        if let pipe {
+            pipe.fileHandleForReading.readabilityHandler = { [self] handle in
+                let chunk = handle.availableData
+                if chunk.isEmpty { endOfOutput() } else { consume(chunk) }
+            }
+        } else {
+            eof = true
+        }
+        process.terminationHandler = { [self] p in processExited(p.terminationStatus) }
+        ChildProcesses.shared.add(process)
+        do {
+            try process.run()
+        } catch {
+            ChildProcesses.shared.remove(process)
+            process.terminationHandler = nil
+            lock.withLock { status = -1; exited = true }
+            endOfOutput()
+            return
+        }
+        if let timeout {
+            let p = process
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { [self] in
+                guard p.isRunning else { return }
+                lock.withLock { timedOut = true }
+                p.terminate()
+                DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+                    if p.isRunning { kill(p.processIdentifier, SIGKILL) }
+                }
+            }
+        }
+    }
+
+    private func consume(_ chunk: Data) {
+        lock.withLock {
+            guard !eof else { return }
+            copyTo?.write(chunk)
+            if keepOutput { output.append(chunk) }
+            if let onLine {
+                for line in lines.append(chunk) {
+                    DispatchQueue.main.async { MainActor.assumeIsolated { onLine(line) } }
+                }
+            }
+        }
+    }
+
+    private func processExited(_ code: Int32) {
+        ChildProcesses.shared.remove(process)
+        lock.withLock { status = code; exited = true }
+        // A grandchild that inherited stdout can keep the pipe open; don't wait for it forever.
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2) { [self] in endOfOutput() }
+        finishIfDone()
+    }
+
+    private func endOfOutput() {
+        pipe?.fileHandleForReading.readabilityHandler = nil
+        lock.withLock {
+            guard !eof else { return }
+            eof = true
+            if let onLine, let rest = lines.flush() {
+                DispatchQueue.main.async { MainActor.assumeIsolated { onLine(rest) } }
+            }
+        }
+        finishIfDone()
+    }
+
+    private func finishIfDone() {
+        lock.withLock {
+            guard exited, eof, let c = cont else { return }
+            cont = nil
+            process.terminationHandler = nil
+            let result = ProcessResult(code: status, output: output, timedOut: timedOut)
+            DispatchQueue.main.async { c.resume(returning: result) }
+        }
     }
 }

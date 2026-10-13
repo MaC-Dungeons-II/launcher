@@ -31,7 +31,7 @@ Dungeons-WinGDK-Shipping.exe
 
 원래 Flightdeck은 자기가 가장 바깥 런타임이라고 가정합니다. 여기서는 어댑터와 정품 런타임 사이에 끼어 있어서 몇 가지를 바꿨습니다([Flightdeck 포크](https://github.com/MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox) `macos` 브랜치).
 
-- **정품 작업 큐 사용** (`GenuineAsync.h`): 게임의 작업 큐는 정품 런타임 소유입니다. Store, GameSave, NetworkSecurity의 비동기 작업은 정품 `IXThreadingImpl`로 처리합니다. 프록시 자체의 XAsync를 쓰면 정품 런타임 메모리에 써서 크래시가 납니다.
+- **정품 작업 큐 사용** (`GenuineAsync.h`): 게임의 작업 큐는 정품 런타임 소유입니다. Store, GameSave, NetworkSecurity, 라이선스 이벤트의 비동기 작업과 큐 호출은 정품 `IXThreadingImpl`로 처리합니다. 프록시 자체의 XAsync를 쓰면 정품 런타임 메모리에 써서 크래시가 납니다.
 - **Store 모듈 지연 시작:** 런타임 초기화 때 xodus store 모듈을 띄우면 게임 창이 뜨기 전에 게임이 종료됐습니다. 그래서 초기화 인자만 저장해 두고, Store나 GameSave를 처음 쓸 때 시작합니다(`EnsureStoreModule`).
 - **GameSave는 어댑터의 XUser 사용:** 이렇게 하지 않으면 사용자 객체가 두 개가 되어 0041 오류가 납니다.
 - **웹소켓:** `wss://`는 `https://`와 같은 정책으로 확인합니다. 포트 0은 443입니다. 게임 정책에 없는 호스트에는 TLS 1.2, 핀 없음을 적용합니다(인증서는 그대로 검증합니다).

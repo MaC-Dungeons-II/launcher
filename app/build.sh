@@ -49,6 +49,6 @@ cp "$D2/src-ffmpeg/ffmpeg-7.1.1/COPYING.LGPLv2.1" "$R/licenses/ffmpeg-LGPL-2.1.t
 cp "$HERE/NOTICE.md" "$R/licenses/NOTICE.md"
 
 echo "== ad-hoc signature"
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || echo "warning: codesign failed"
+codesign --force --deep --sign - "$APP" >/dev/null || { echo "error: codesign failed" >&2; exit 1; }
 du -sh "$APP"
 echo "BUILT $APP"

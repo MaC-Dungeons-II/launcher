@@ -24,7 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     weak var launcher: Launcher?
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
     func applicationWillTerminate(_ notification: Notification) {
-        MainActor.assumeIsolated { launcher?.stopHelpers() }
+        // stops Wine first if the game is still running, then helpers and other children
+        MainActor.assumeIsolated { launcher?.shutdown() }
     }
 }
 

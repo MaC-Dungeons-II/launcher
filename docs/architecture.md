@@ -31,7 +31,7 @@ The launcher copies layers 1 and 2 over the game folder before every launch (`ov
 
 Upstream Flightdeck expects to be the outermost runtime. Here it sits between the adapter and the genuine runtime, so a few things changed (`macos` branch of the [Flightdeck fork](https://github.com/MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox)):
 
-- **Genuine task queues** (`GenuineAsync.h`). The game's task queues belong to the genuine runtime. Store, GameSave and NetworkSecurity async work goes through the genuine `IXThreadingImpl`. The proxy's own XAsync copy would write into the genuine runtime's memory and crash.
+- **Genuine task queues** (`GenuineAsync.h`/`.cpp`). The game's task queues belong to the genuine runtime. Store, GameSave, NetworkSecurity and license-event async work and queue calls go through the genuine `IXThreadingImpl`. The proxy's own XAsync copy would write into the genuine runtime's memory and crash.
 - **Lazy Store module.** Starting the xodus store module during runtime init shut the game down before its window opened. The init arguments are saved and the module starts on first Store or GameSave use (`EnsureStoreModule`).
 - **GameSave uses the adapter's XUser.** Otherwise there are two user objects and the game fails with 0041.
 - **Websockets.** `wss://` is checked like `https://`. Port 0 means 443. Hosts outside the title's policy get TLS 1.2 with no pins (certificates are still verified).

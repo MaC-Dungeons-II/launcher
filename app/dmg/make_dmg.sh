@@ -27,11 +27,14 @@ cp "$APP/Contents/Resources/AppIcon.icns" "$STAGE/.VolumeIcon.icns"
 SIZE=$(( $(du -sm "$STAGE" | cut -f1) + 64 ))
 hdiutil create -quiet -srcfolder "$STAGE" -volname "$VOL" -fs HFS+ -format UDRW -size ${SIZE}m "$WORK/rw.dmg"
 MNT=$(hdiutil attach -readwrite -noverify -noautoopen "$WORK/rw.dmg" | awk -F'\t' '/\/Volumes\//{print $NF}')
+[ -n "$MNT" ] && [ -d "$MNT" ] || { echo "error: could not attach $WORK/rw.dmg" >&2; exit 1; }
+# Another mounted "$VOL" makes this one "$VOL 1": style the disk actually mounted.
+DISK=$(basename "$MNT")
 SetFile -a C "$MNT"
 
 osascript <<EOF
 tell application "Finder"
-    tell disk "$VOL"
+    tell disk "$DISK"
         open
         set current view of container window to icon view
         set toolbar visible of container window to false
