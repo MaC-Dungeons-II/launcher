@@ -32,6 +32,18 @@ macOS용 ARM64 Wine에서 **FEX**가 ARM64EC 방식으로 x86_64 코드를 에�
 - **DXMT:** ARM64EC 지원이 들어갔고(PR #202, #209), 앱에 넣은 빌드(50102f9)에도 포함돼 있습니다. CI가 arm64 Unix 쪽을 패키징하지 않아서 `winemetal.so`는 소스에서 빌드해야 합니다.
 - **커뮤니티 완성 런타임**(Hadron, neutron): **쓰지 않습니다.** 소스와 빌드 과정을 확인할 수 없는 바이너리는 실행하지 않습니다.
 
+## 서명 조건 (CrossOver든 아니든 모든 ARM64 Wine에 해당)
+
+Windows 프로그램은 4GB 아래 메모리를 써야 합니다. 여기에는 `0x7FFE0000`의 `KUSER_SHARED_DATA`도 들어가는데, 게임과 변조 방지 코드가 이곳을 직접 읽습니다. macOS는 이 메모리를 `com.apple.developer.cross-architecture-support` 권한으로 서명된 로더에만 줍니다. 이건 macOS 규칙이라 Wine 소스를 누가 만들었든 똑같이 적용됩니다.
+
+- 2026-09-29부터 이 기능("Cross-architecture Compatibility Framework")은 Apple Developer 포털의 App ID에서 바로 켤 수 있습니다. 신청이나 심사가 필요 없습니다.
+- 이 권한이 붙은 ad-hoc 서명 바이너리는 AMFI가 종료시킵니다. 반드시 프로비저닝 프로필로 서명해야 해서 **Apple Developer 계정**이 필요합니다. 내 Mac 테스트에는 개발용 프로필이 필요하고, 배포하려면 Developer ID 프로필과 공증이 필요합니다.
+- CrossOver와 Hadron은 Wine 로더를 작은 `.app`으로 감싸 그쪽에만 권한을 줍니다. 메인 앱에는 주지 않습니다.
+- 권한이 없으면 "dev" 방식만 됩니다. 낮은 고정 주소를 4GB 위로 옮기고, 64비트 프로그램만 돌아갑니다. 이 게임의 변조 방지 코드는 고정 주소를 직접 읽을 가능성이 커서, 이 방식으로는 실패할 것으로 봅니다(시험은 안 해 봤습니다).
+- 같은 계정이 있으면 앱을 공증할 수 있어서, "그래도 열기" 절차도 없어집니다.
+
+ARM64 Wine + FEX 빌드와 로더 서명의 오픈소스 참고 자료: [Broyojo/hadron](https://github.com/Broyojo/hadron)(공식 Wine, FEX, DXMT 커밋을 고정하고 패치를 얹습니다. docs/apple-developer-setup.md 참고).
+
 ## 이 저장소에서 이미 준비한 것
 
 - 런처가 번들 안 폴더(`lib/wine/aarch64-unix`인지 `x86_64-unix`인지)를 보고 런타임 아키텍처를 판단합니다. x86_64 런타임일 때만 Rosetta를 확인하고, 없으면 설치 방법을 안내합니다.

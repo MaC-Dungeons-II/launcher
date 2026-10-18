@@ -32,6 +32,18 @@ A side benefit, measured 2026-10-18: the game's anti-tamper code deliberately ex
 - **DXMT:** ARM64EC support is merged (PR #202, #209), and the bundled build (50102f9) includes it. CI does not package an arm64 Unix side yet, so `winemetal.so` has to be built from source.
 - **Prebuilt community runtimes** (Hadron, neutron): **not used**. We don't run binaries whose sources and build we can't verify.
 
+## Signing requirement (applies to any ARM64 Wine, CrossOver's or not)
+
+Windows programs need memory below 4GB, including `KUSER_SHARED_DATA` at `0x7FFE0000`, which games and anti-tamper code read directly. macOS only grants that to a loader signed with `com.apple.developer.cross-architecture-support`. This is a macOS rule, so it applies whoever wrote the Wine sources.
+
+- As of 2026-09-29 the capability ("Cross-architecture Compatibility Framework") is self-serve on an App ID in the Apple Developer portal. No request or approval is needed.
+- AMFI kills ad-hoc signed binaries that carry it. It must come from a provisioning profile, so this needs an **Apple Developer account**: a development profile for local testing, and a Developer ID profile plus notarization for distribution.
+- CrossOver and Hadron wrap the Wine loader in a small `.app` that carries the entitlement; the main app doesn't.
+- Without it, only a "dev" layout works: low fixed addresses are moved above 4GB, and only 64-bit programs run. This game's anti-tamper probably reads fixed addresses directly, so expect it to fail there (untested).
+- The same account also removes the "Open Anyway" step, because the app can then be notarized.
+
+Open-source reference for the ARM64 Wine + FEX build and the loader signing: [Broyojo/hadron](https://github.com/Broyojo/hadron) (pins upstream Wine, FEX and DXMT commits plus patch queues; see its docs/apple-developer-setup.md).
+
 ## Already prepared in this repo
 
 - The launcher reads the runtime's architecture from the bundle (`lib/wine/aarch64-unix` vs `x86_64-unix`). It checks for Rosetta only when the runtime is x86_64, and explains how to install it if it's missing.
