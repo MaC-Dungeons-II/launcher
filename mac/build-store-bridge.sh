@@ -6,12 +6,19 @@
 # Outputs in $OUT/artifacts:
 #   xgameruntime.dll          proxy the game loads (wraps xgameruntime_original.dll)
 #   xodus_store_test.dll      Wine builtin User/Store module (PE)
-#   xodus_store_test.so       Unix socket transport to xodus-service (x86_64)
+#   xodus_store_test.so       Unix socket transport to xodus-service ($HOST_ARCH)
 #
 # Inputs:
 #   $FD    Flightdeck checkout (compat/runtime, compat/patches)
 #   $SRC   Sightem/WineGDK b5d23b0 with compat/patches/winegdk-runtime.patch applied
 set -euo pipefail
+# Architecture of the Wine runtime's Unix side; only x86_64 exists today
+# (see docs/arm64-migration.md).
+HOST_ARCH=${HOST_ARCH:-x86_64}
+case $HOST_ARCH in
+    x86_64) PE_DIR=x86_64-windows ;;
+    *) echo "HOST_ARCH=$HOST_ARCH is not supported yet (see docs/arm64-migration.md)" >&2; exit 2 ;;
+esac
 
 D2=${D2:-$(cd "$(dirname "$0")/.." && pwd)/.work}
 FD=${FD:?Flightdeck checkout}
@@ -40,17 +47,17 @@ make -j"$JOBS" __tooldeps__ >make.log 2>&1
 
 echo "== xodus_store_test.dll (PE)"
 mkdir -p "$OUT/wine" && cd "$OUT/wine"
-[ -f Makefile ] || "$SRC/configure" --host=x86_64-apple-darwin --enable-archs=x86_64 "${common[@]}" \
+[ -f Makefile ] || "$SRC/configure" --host=$HOST_ARCH-apple-darwin --enable-archs=x86_64 "${common[@]}" \
   --with-wine-tools="$OUT/tools" \
-  CC="/usr/bin/clang -arch x86_64" CXX="/usr/bin/clang++ -arch x86_64" \
+  CC="/usr/bin/clang -arch $HOST_ARCH" CXX="/usr/bin/clang++ -arch $HOST_ARCH" \
   x86_64_CC=x86_64-w64-mingw32-clang x86_64_CXX=x86_64-w64-mingw32-clang++ >configure.log 2>&1
-make -j"$JOBS" dlls/xgameruntime/x86_64-windows/xodus_store_test.dll >make.log 2>&1
+make -j"$JOBS" dlls/xgameruntime/$PE_DIR/xodus_store_test.dll >make.log 2>&1
 
 A="$OUT/artifacts"; mkdir -p "$A"
-cp dlls/xgameruntime/x86_64-windows/xodus_store_test.dll "$A/"
+cp dlls/xgameruntime/$PE_DIR/xodus_store_test.dll "$A/"
 
-echo "== xodus_store_test.so (x86_64 macOS)"
-/usr/bin/clang -arch x86_64 -shared -fPIC -O2 -D__WINESRC__ -DWINE_NO_TRACE_MSGS -DWINE_NO_DEBUG_MSGS \
+echo "== xodus_store_test.so ($HOST_ARCH macOS)"
+/usr/bin/clang -arch "$HOST_ARCH" -shared -fPIC -O2 -D__WINESRC__ -DWINE_NO_TRACE_MSGS -DWINE_NO_DEBUG_MSGS \
   -fshort-wchar -pthread -undefined dynamic_lookup -I"$SRC/include" -I"$OUT/wine/include" \
   "$SRC/dlls/xgameruntime/GDKComponent/Xodus/Unix/socket.c" -o "$A/xodus_store_test.so"
 

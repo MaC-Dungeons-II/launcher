@@ -1,5 +1,5 @@
 #!/bin/bash
-# Add a minimal GStreamer (x86_64) to the Wine runtime so winegstreamer can
+# Add a minimal GStreamer (Wine runtime architecture) to the Wine runtime so winegstreamer can
 # decode the game's H.264/AAC videos through Media Foundation.
 #
 # Input: the official GStreamer macOS packages (gstreamer.freedesktop.org,
@@ -11,6 +11,15 @@
 # Layout written into $RT (runtime-cx), matching the rpaths of the official
 # binaries: lib/*.dylib, lib/gstreamer-1.0/*.dylib, libexec/gstreamer-1.0/.
 set -euo pipefail
+# Architecture of the Wine runtime's Unix side. Only x86_64 (runs under
+# Rosetta) exists today; an arm64 runtime needs ARM64 Wine + an x86_64
+# emulator (FEX), whose macOS sources ship with CrossOver 27 (early 2027).
+# See docs/arm64-migration.md. Every arch-specific name below derives from it.
+HOST_ARCH=${HOST_ARCH:-x86_64}
+case $HOST_ARCH in
+    x86_64) UNIX_DIR=x86_64-unix PE_DIR=x86_64-windows ;;
+    *) echo "HOST_ARCH=$HOST_ARCH is not supported yet (see docs/arm64-migration.md)" >&2; exit 2 ;;
+esac
 
 D2=${D2:-$(cd "$(dirname "$0")/.." && pwd)/.work}
 GST=${GST:-$D2/src-gst/root}
@@ -23,10 +32,10 @@ PLUGINS="coreelements playback typefindfunctions isomp4 libav audioparsers
 videoparsersbad videoconvertscale audioconvert audioresample app autodetect
 videorate volume deinterlace videofilter"
 
-thin() {  # copy a Mach-O as an x86_64-only file
+thin() {  # copy a Mach-O as a single-architecture ($HOST_ARCH) file
     local src=$1 dst=$2
-    if lipo -archs "$src" 2>/dev/null | grep -q arm64; then
-        lipo "$src" -thin x86_64 -output "$dst"
+    if [ "$(lipo -archs "$src" 2>/dev/null | wc -w)" -gt 1 ]; then
+        lipo "$src" -thin "$HOST_ARCH" -output "$dst"
     else
         cp "$src" "$dst"
     fi
@@ -67,9 +76,9 @@ while [ ${#queue[@]} -gt 0 ]; do
 done
 
 # winegstreamer itself; resolve GStreamer from lib/ like winedmo does
-so="$RT/lib/wine/x86_64-unix/winegstreamer.so"
+so="$RT/lib/wine/$UNIX_DIR/winegstreamer.so"
 cp "$BUILD/dlls/winegstreamer/winegstreamer.so" "$so"
-cp "$BUILD/dlls/winegstreamer/x86_64-windows/winegstreamer.dll" "$RT/lib/wine/x86_64-windows/winegstreamer.dll"
+cp "$BUILD/dlls/winegstreamer/$PE_DIR/winegstreamer.dll" "$RT/lib/wine/$PE_DIR/winegstreamer.dll"
 install_name_tool -delete_rpath @loader_path/../../gstreamer "$so" 2>/dev/null || true
 otool -l "$so" | grep -q '@loader_path/../..' || install_name_tool -add_rpath @loader_path/../.. "$so"
 
