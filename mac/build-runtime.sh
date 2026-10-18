@@ -19,7 +19,7 @@
 #   src-gst/root        official GStreamer macOS packages, expanded
 #                       (gstreamer-1.0[-devel]-1.28.7-universal.pkg)
 #   sdl-x64             SDL 2.32.10 x86_64 build (build_sdl below)
-#   dxmt/<rev>          3Shain/dxmt CI artifact 68af85e (D3D11 on Metal)
+#   dxmt/<rev>          3Shain/dxmt CI artifact 50102f9 (D3D11 on Metal)
 #   gdk-wgdk            PE builtins from GDK-Proton 11-7 (LukasPAH/GDK-Proton-Custom):
 #                       xgameruntime, wintypes, twinapi.appcore, windows.web,
 #                       windows.devices.enumeration, windows.ui.core.textinput,
@@ -29,17 +29,26 @@
 #
 # Usage: mac/build-runtime.sh [ffmpeg|sdl|wine|assemble|all]   (default: all)
 set -euo pipefail
+# Architecture of the Wine runtime's Unix side. Only x86_64 (runs under
+# Rosetta) exists today; an arm64 runtime needs ARM64 Wine + an x86_64
+# emulator (FEX), whose macOS sources ship with CrossOver 27 (early 2027).
+# See docs/arm64-migration.md. Every arch-specific name below derives from it.
+HOST_ARCH=${HOST_ARCH:-x86_64}
+case $HOST_ARCH in
+    x86_64) UNIX_DIR=x86_64-unix PE_DIR=x86_64-windows ;;
+    *) echo "HOST_ARCH=$HOST_ARCH is not supported yet (see docs/arm64-migration.md)" >&2; exit 2 ;;
+esac
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 D2=${D2:-$(cd "$HERE/.." && pwd)/.work}
 SRC=${SRC:-$D2/src-cx/wine}
 OUT=${OUT:-$D2/build-cx}
 RT=${RT:-$D2/runtime-cx}
-HOSTLIBS=$D2/toolchain/hostlibs/x86_64
+HOSTLIBS=$D2/toolchain/hostlibs/$HOST_ARCH
 FFMPEG=$D2/ffmpeg-x64
 GST=$D2/src-gst/root
 SDL=$D2/sdl-x64
-DXMT=$D2/dxmt/68af85e96196e1cf9f50de9fe24c70f03a1db4a7
+DXMT=$D2/dxmt/50102f994b406f58f56d5d09f2ad20f9b90390a2
 JOBS=$(sysctl -n hw.ncpu)
 export PATH="/opt/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
@@ -62,8 +71,8 @@ require_mingw() {
 build_ffmpeg() {
     local src=$D2/src-ffmpeg/ffmpeg-7.1.1
     mkdir -p "$D2/src-ffmpeg/build" && cd "$D2/src-ffmpeg/build"
-    "$src/configure" --prefix="$FFMPEG" --enable-cross-compile --arch=x86_64 --target-os=darwin \
-        --cc="/usr/bin/clang -arch x86_64" --enable-shared --disable-static \
+    "$src/configure" --prefix="$FFMPEG" --enable-cross-compile --arch=$HOST_ARCH --target-os=darwin \
+        --cc="/usr/bin/clang -arch $HOST_ARCH" --enable-shared --disable-static \
         --disable-programs --disable-doc --disable-network --disable-autodetect --disable-x86asm \
         --disable-everything \
         --enable-demuxer=mov,mp3,aac,matroska,wav,ogg \
@@ -78,7 +87,7 @@ build_ffmpeg() {
 # for game controllers, which maps Xbox Bluetooth pads correctly on macOS.
 build_sdl() {
     mkdir -p "$D2/src-sdl/build" && cd "$D2/src-sdl/build"
-    cmake ../SDL2-2.32.10 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+    cmake ../SDL2-2.32.10 -DCMAKE_OSX_ARCHITECTURES=$HOST_ARCH -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$SDL" -DCMAKE_INSTALL_NAME_DIR=@rpath \
         -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF
     make -j"$JOBS" && make install
@@ -97,11 +106,11 @@ build_wine() {
         >configure.log 2>&1
     make -j"$JOBS" __tooldeps__ >make.log 2>&1
 
-    echo "== wine (x86_64)"
+    echo "== wine ($HOST_ARCH)"
     mkdir -p "$OUT/wine" && cd "$OUT/wine"
-    "$SRC/configure" --prefix="$RT" --host=x86_64-apple-darwin --enable-archs=x86_64 "${common[@]}" \
+    "$SRC/configure" --prefix="$RT" --host=$HOST_ARCH-apple-darwin --enable-archs=x86_64 "${common[@]}" \
         --with-wine-tools="$OUT/tools" \
-        CC="/usr/bin/clang -arch x86_64" CXX="/usr/bin/clang++ -arch x86_64" \
+        CC="/usr/bin/clang -arch $HOST_ARCH" CXX="/usr/bin/clang++ -arch $HOST_ARCH" \
         x86_64_CC=x86_64-w64-mingw32-clang x86_64_CXX=x86_64-w64-mingw32-clang++ \
         GNUTLS_CFLAGS="-I/opt/local/include" GNUTLS_LIBS="-L$HOSTLIBS -lgnutls" \
         FREETYPE_CFLAGS="-I/opt/local/include/freetype2" FREETYPE_LIBS="-L$HOSTLIBS -lfreetype" \
@@ -121,7 +130,7 @@ build_wine() {
 }
 
 assemble() {
-    local unix=$RT/lib/wine/x86_64-unix pe=$RT/lib/wine/x86_64-windows
+    local unix=$RT/lib/wine/$UNIX_DIR pe=$RT/lib/wine/$PE_DIR
     echo "== host libraries"
     local hostlibs=("$HOSTLIBS"/*.dylib)
     [ -f "${hostlibs[0]}" ] || { echo "error: no host libraries in $HOSTLIBS" >&2; exit 1; }
@@ -133,12 +142,12 @@ assemble() {
     otool -l "$unix/winedmo.so" | grep -q '@loader_path/../..' || install_name_tool -add_rpath @loader_path/../.. "$unix/winedmo.so"
 
     echo "== DXMT (d3d11/dxgi on Metal)"
-    cp "$DXMT"/x86_64-windows/{d3d11,dxgi,d3d10core,winemetal}.dll "$pe/"
-    cp "$DXMT/x86_64-unix/winemetal.so" "$unix/"
+    cp "$DXMT"/$PE_DIR/{d3d11,dxgi,d3d10core,winemetal}.dll "$pe/"
+    cp "$DXMT/$UNIX_DIR/winemetal.so" "$unix/"
 
     echo "== GDK builtins"
     cp "$D2"/gdk-wgdk/*.dll "$pe/"
-    cp "$D2/build-fd/wine/dlls/gameinput/x86_64-windows/gameinput.dll" "$pe/"
+    cp "$D2/build-fd/wine/dlls/gameinput/$PE_DIR/gameinput.dll" "$pe/"
     cp "$D2/build-fd/artifacts/xodus_store_test.dll" "$pe/"
     cp "$D2/build-fd/artifacts/xodus_store_test.so" "$unix/"
 

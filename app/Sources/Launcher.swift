@@ -3,6 +3,7 @@
 // prefix, saves, session) lives in ~/Library/Application Support/M(a)C Dungeons II.
 import Foundation
 import AppKit
+import CoreGraphics
 import CryptoKit
 
 @MainActor
@@ -126,6 +127,7 @@ final class Launcher: ObservableObject {
                     "게임이 쓰는 Xbox 런타임(Microsoft GDK)을 Microsoft에서 직접 내려받아요.")
                 return
             }
+            try await ensureRosetta()
             try await ensureDependencies()
             try await ensureGame()
             try overlayLayer()
@@ -251,6 +253,28 @@ final class Launcher: ObservableObject {
                 ("/COPYING.txt", "curl-LICENSE.txt", ""),
             ]),
     ]
+
+    /// Architecture folders of the bundled Wine runtime, read from the bundle
+    /// itself: the current runtime is x86_64 (runs under Rosetta); an arm64
+    /// runtime (ARM64 Wine with an x86_64 emulator, see docs/arm64-migration.md)
+    /// would ship aarch64-unix/aarch64-windows instead.
+    private var wineUnixDir: String {
+        fm.fileExists(atPath: wine.appendingPathComponent("lib/wine/aarch64-unix").path) ? "aarch64-unix" : "x86_64-unix"
+    }
+    private var winePEDir: String {
+        fm.fileExists(atPath: wine.appendingPathComponent("lib/wine/aarch64-windows").path) ? "aarch64-windows" : "x86_64-windows"
+    }
+
+    /// An x86_64 Wine runtime needs Rosetta 2. Without it every Wine process
+    /// fails with an unclear error, so check first and say what to do.
+    /// macOS 27 is the last release with full Rosetta (see docs/arm64-migration.md).
+    private func ensureRosetta() async throws {
+        guard wineUnixDir == "x86_64-unix" else { return }
+        let probe = await execute(URL(fileURLWithPath: "/usr/bin/arch"), ["-x86_64", "/usr/bin/true"],
+                                  log: "tools.log", timeout: 20)
+        guard probe.code != 0 else { return }
+        throw LauncherError("Rosetta가 필요해요. 터미널에서 softwareupdate --install-rosetta 를 실행한 뒤 다시 시도해 주세요.")
+    }
 
     private func ensureDependencies() async throws {
         for dep in dependencies {
@@ -420,6 +444,7 @@ final class Launcher: ObservableObject {
 
     private var wineEnv: [String: String] {
         var env = ProcessInfo.processInfo.environment
+        env.merge(debugOverrides()) { _, file in file }
         env["WINEPREFIX"] = prefix.path
         env["PATH"] = wine.appendingPathComponent("bin").path + ":/usr/bin:/bin:/usr/sbin:/sbin"
         env["DYLD_FALLBACK_LIBRARY_PATH"] = wine.appendingPathComponent("lib").path + ":/usr/lib"
@@ -434,8 +459,38 @@ final class Launcher: ObservableObject {
         env["GST_REGISTRY_1_0"] = data.appendingPathComponent("gstreamer-registry.bin").path
         env.removeValue(forKey: "GST_PLUGIN_PATH_1_0")
         env.removeValue(forKey: "GST_PLUGIN_PATH")
+        // DXMT (D3D11 on Metal): Metal paces frames at a rate that divides the
+        // display's refresh rate (60 on a 120 Hz ProMotion panel) instead of
+        // the game rendering as fast as the GPU allows; MetalFX spatial
+        // upscaling sharpens the swapchain output to the Retina resolution.
+        // Compiled shaders persist across launches.
+        env["DXMT_CONFIG"] = env["MACD2_DXMT_CONFIG"] ?? "d3d11.preferredMaxFrameRate=\(Self.pacedFrameRate());"
+        env["DXMT_METALFX_SPATIAL_SWAPCHAIN"] = env["MACD2_METALFX"] ?? "1"
+        env["DXMT_SHADER_CACHE_PATH"] = data.appendingPathComponent("shader-cache").path
         env["WINEDLLOVERRIDES"] = "mscoree,mshtml=;msvcp140,msvcp140_1,msvcp140_2,vcruntime140,vcruntime140_1=n,b;xgameruntime,xcurl=n"
         return env
+    }
+
+    /// Largest frame rate up to 60 that divides the main display's refresh
+    /// rate (DXMT requires a divisor): 120 Hz -> 60, 60 Hz -> 60, 144 Hz -> 48.
+    private static func pacedFrameRate() -> Int {
+        let hz = NSScreen.main?.maximumFramesPerSecond ?? 60
+        guard hz > 0 else { return 60 }
+        return (1...min(60, hz)).reversed().first { hz % $0 == 0 } ?? 60
+    }
+
+    /// Optional KEY=VALUE lines in <data>/debug.env (blank lines and # comments
+    /// ignored) applied to every Wine process, for diagnostics without a
+    /// rebuild, e.g. MACD2_WINEDEBUG=err+all,+seh or MACD2_METALFX=0.
+    private func debugOverrides() -> [String: String] {
+        guard let text = try? String(contentsOf: data.appendingPathComponent("debug.env"), encoding: .utf8) else { return [:] }
+        var out: [String: String] = [:]
+        for raw in text.split(whereSeparator: \.isNewline) {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            guard !line.isEmpty, !line.hasPrefix("#"), let eq = line.firstIndex(of: "=") else { continue }
+            out[String(line[..<eq]).trimmingCharacters(in: .whitespaces)] = String(line[line.index(after: eq)...]).trimmingCharacters(in: .whitespaces)
+        }
+        return out
     }
 
     /// Runs a Wine command against the prefix, logging to prefix.log.
@@ -504,10 +559,12 @@ final class Launcher: ObservableObject {
     }
 
     /// The prefix keeps copies of builtin DLLs from the Wine that created it.
-    /// Refresh the ones this launcher replaces (full GameInput for controllers).
+    /// Refresh the ones this launcher replaces: GameInput (controllers), the
+    /// media decoders, and DXMT (d3d11/dxgi on Metal) so runtime updates apply.
     private func syncBuiltins() {
-        for name in ["gameinput.dll", "winedmo.dll", "winegstreamer.dll"] {
-            let src = wine.appendingPathComponent("lib/wine/x86_64-windows/\(name)")
+        for name in ["gameinput.dll", "winedmo.dll", "winegstreamer.dll",
+                     "d3d11.dll", "dxgi.dll", "d3d10core.dll", "winemetal.dll"] {
+            let src = wine.appendingPathComponent("lib/wine/\(winePEDir)/\(name)")
             if fm.fileExists(atPath: src.path) { try? replace(system32.appendingPathComponent(name), with: src) }
         }
     }
@@ -568,6 +625,7 @@ final class Launcher: ObservableObject {
                                     env: env, cwd: gameBinaries, log: "game.log")
         watchdog.cancel()
         let stoppedByWatchdog = await watchdog.value
+        appendLog("game.log", "launcher: game process ended with code \(code)\(stoppedByWatchdog ? " after the exit watchdog stopped Wine" : "")")
         await killWineServer(env: env, log: "game.log")
         usedWine = false
         stopHelpers()
@@ -580,19 +638,21 @@ final class Launcher: ObservableObject {
     }
 
     /// The game hangs after quitting from its menu: its window stays (hidden)
-    /// and one game thread keeps the process alive. Window state is not a
-    /// reliable signal (windows stay listed after exit, and leave the screen
-    /// during fullscreen/resize), so watch the Wine process's thread count:
-    /// ~100+ while running, under 10 once the game has shut down. Once it has
-    /// run and then stays low for a second, stop the Wine session.
+    /// and one game thread keeps the process alive. Measured: ~100-130 Wine
+    /// threads while playing, 8 after the game shut down, with its windows
+    /// still listed but none on screen. Stop the Wine session only when, after
+    /// the game has run, the thread count stays low for 3 s AND none of its
+    /// windows is on screen. A sample that can't be read counts as "unknown",
+    /// never as low. Every decision that stops Wine is written to game.log.
     /// Returns true when it stopped the Wine session itself.
     private func watchGameExit(env: [String: String]) async -> Bool {
-        let runningThreads: Int32 = 60, exitedThreads: Int32 = 12
+        let runningThreads: Int32 = 60, exitedThreads: Int32 = 12, holdSeconds = 3.0
         // only Wine's own processes; `macd2 run` matches the pattern too.
         // Both sides resolved: app translocation, /var -> /private/var.
         let wineDir = Self.realPath(wine.path) + "/"
         var started = false
         var lowSince: Date? = nil
+        var lowSamples = 0
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: 500_000_000)
             if Task.isCancelled { break }
@@ -600,12 +660,19 @@ final class Launcher: ObservableObject {
                                       log: "tools.log", captureOutput: true)
             let pids = String(decoding: found.output, as: UTF8.self)
                 .split(separator: "\n").compactMap { Int32($0) }
-            if pids.isEmpty { return false }
-            let threads = pids.filter { Self.realPath(executablePath($0)).hasPrefix(wineDir) }.map(threadCount).max() ?? 0
-            if threads >= runningThreads { started = true; lowSince = nil; continue }
-            guard started, threads <= exitedThreads else { lowSince = nil; continue }
+                .filter { Self.realPath(executablePath($0)).hasPrefix(wineDir) }
+            if found.code == 1 && pids.isEmpty { return false }   // pgrep: no game process left
+            let counts = pids.compactMap(threadCount)
+            guard let threads = counts.max() else { lowSince = nil; lowSamples = 0; continue }  // unknown
+            if threads >= runningThreads { started = true; lowSince = nil; lowSamples = 0; continue }
+            guard started, threads <= exitedThreads else { lowSince = nil; lowSamples = 0; continue }
+            let onScreen = onScreenWindows(of: Set(pids))
+            guard onScreen == 0 else { lowSince = nil; lowSamples = 0; continue }
+            lowSamples += 1
             guard let since = lowSince else { lowSince = Date(); continue }
-            if Date().timeIntervalSince(since) >= 1 {
+            let held = Date().timeIntervalSince(since)
+            if held >= holdSeconds && lowSamples >= 6 {
+                appendLog("game.log", "launcher: game exit detected (threads=\(threads), low for \(String(format: "%.1f", held))s, \(lowSamples) samples, on-screen windows=0); stopping Wine")
                 await killWineServer(env: env, log: "game.log")
                 return true
             }
@@ -613,15 +680,32 @@ final class Launcher: ObservableObject {
         return false
     }
 
+    /// Game windows currently on screen (not just listed: a hung, finished
+    /// game keeps hidden windows around).
+    private func onScreenWindows(of pids: Set<Int32>) -> Int {
+        let windows = (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]) ?? []
+        return windows.filter { w in
+            guard let pid = w[kCGWindowOwnerPID as String] as? Int32, pids.contains(pid) else { return false }
+            return ((w[kCGWindowBounds as String] as? [String: Double])?["Width"] ?? 0) > 200
+        }.count
+    }
+
+    private func appendLog(_ name: String, _ line: String) {
+        guard let h = logHandle(name) else { return }
+        h.write(Data((line + "\n").utf8))
+        try? h.close()
+    }
+
     private func executablePath(_ pid: Int32) -> String {
         var buf = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
         return proc_pidpath(pid, &buf, UInt32(buf.count)) > 0 ? String(cString: buf) : ""
     }
 
-    private func threadCount(_ pid: Int32) -> Int32 {
+    /// nil when the process can't be read (exiting, transient failure).
+    private func threadCount(_ pid: Int32) -> Int32? {
         var info = proc_taskinfo()
         let size = Int32(MemoryLayout<proc_taskinfo>.size)
-        return proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &info, size) == size ? info.pti_threadnum : 0
+        return proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &info, size) == size ? info.pti_threadnum : nil
     }
 
     func stopHelpers() {
