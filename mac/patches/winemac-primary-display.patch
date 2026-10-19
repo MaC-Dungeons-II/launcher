@@ -1,0 +1,37 @@
+--- a/dlls/winemac.drv/cocoa_display.m
++++ b/dlls/winemac.drv/cocoa_display.m
+@@ -522,6 +522,25 @@
+  *
+  * Returns non-zero value on failure with parameters unchanged and zero on success.
+  */
++/* M(a)C Dungeons II: MACD2_PRIMARY_DISPLAY=<CGDirectDisplayID> reports that
++ * display as Windows' primary monitor instead of the menu-bar display, so a
++ * game opens (and goes fullscreen) there. Monitor coordinates stay relative to
++ * the menu-bar display; win32u uses the primary's real rectangle. Falls back to
++ * the menu-bar display if the requested one is offline or mirrored. */
++static BOOL display_is_primary(CGDirectDisplayID display_id, const CGDirectDisplayID *display_ids, uint32_t count)
++{
++    const char *env = getenv("MACD2_PRIMARY_DISPLAY");
++    if (env && *env)
++    {
++        CGDirectDisplayID wanted = (CGDirectDisplayID)strtoul(env, NULL, 10);
++        uint32_t i;
++        for (i = 0; i < count; i++)
++            if (display_ids[i] == wanted && CGDisplayMirrorsDisplay(wanted) == kCGNullDirectDisplay)
++                return display_id == wanted;
++    }
++    return CGDisplayIsMain(display_id);
++}
++
+ int macdrv_get_adapters(uint64_t gpu_id, struct macdrv_adapter** new_adapters, int* count)
+ {
+     CGDirectDisplayID display_ids[16];
+@@ -563,7 +582,7 @@
+             adapters[adapter_count].id = display_ids[i];
+             adapters[adapter_count].state_flags = DISPLAY_DEVICE_ATTACHED_TO_DESKTOP;
+ 
+-            if (CGDisplayIsMain(display_ids[i]))
++            if (display_is_primary(display_ids[i], display_ids, display_id_count))
+             {
+                 adapters[adapter_count].state_flags |= DISPLAY_DEVICE_PRIMARY_DEVICE;
+                 primary_index = adapter_count;

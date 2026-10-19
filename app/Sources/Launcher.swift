@@ -583,6 +583,10 @@ final class Launcher: ObservableObject {
         env["XODUS_USER_SOCKET_SUFFIX"] = "macd2.sock"
         env["MACD2_VIEW"] = "1"   // decrypted executables live only in a RAM-disk view of the game
         env["MACD2_ICON_MASK"] = resources.appendingPathComponent("dock-mask.png").path  // rounded Dock icon
+        if let display = launcherDisplayID() {
+            env["MACD2_PRIMARY_DISPLAY"] = String(display)
+            appendLog("game.log", "launcher: using display \(display) (the launcher's) as the primary monitor")
+        }
 
         await stopStaleHelpers()
         do {
@@ -616,6 +620,7 @@ final class Launcher: ObservableObject {
         set("게임 실행 중", "게임을 끄면 런처도 함께 정리돼요")
         usedWine = true
         let watchdog = Task { await self.watchGameExit(env: env) }
+        let adapterLog = Task { await self.keepAdapterLogging() }
         // xodus decrypts the encrypted executable into memory with the
         // account's license on every launch; nothing is written decrypted.
         let code = await runProcess(cli,
@@ -624,6 +629,7 @@ final class Launcher: ObservableObject {
                                      "--", "-dx11"],
                                     env: env, cwd: gameBinaries, log: "game.log")
         watchdog.cancel()
+        adapterLog.cancel()
         let stoppedByWatchdog = await watchdog.value
         appendLog("game.log", "launcher: game process ended with code \(code)\(stoppedByWatchdog ? " after the exit watchdog stopped Wine" : "")")
         await killWineServer(env: env, log: "game.log")
@@ -635,6 +641,36 @@ final class Launcher: ObservableObject {
         } else {
             NSApp.terminate(nil)
         }
+    }
+
+    /// With MACD2_ADAPTER_LOG=1 in debug.env, keep the mcd2 adapter's
+    /// diagnostics (session/http.log, runtime.log: request shapes and status,
+    /// never token values) on while playing. The adapter honours a flag for at
+    /// most an hour, so a fresh one-hour flag is written every 30 minutes.
+    private func keepAdapterLogging() async {
+        let flag = session.appendingPathComponent("logging.enabled")
+        guard debugOverrides()["MACD2_ADAPTER_LOG"] == "1" else { return }
+        while !Task.isCancelled {
+            let now = Int(Date().timeIntervalSince1970)
+            let body = "{\"version\":1,\"started\":\(now),\"expires\":\(now + 3600)}"
+            try? Data(body.utf8).write(to: flag, options: .atomic)
+            try? await Task.sleep(nanoseconds: 30 * 60 * 1_000_000_000)
+        }
+        try? fm.removeItem(at: flag)
+    }
+
+    /// The game opens, and goes fullscreen, on Windows' primary monitor, which
+    /// Wine maps to the macOS menu-bar display. To use the display the launcher
+    /// window is on instead, hand its CGDirectDisplayID to winemac
+    /// (MACD2_PRIMARY_DISPLAY, mac/patches/winemac-primary-display.patch),
+    /// which then reports that display as primary. nil when it already is.
+    private func launcherDisplayID() -> CGDirectDisplayID? {
+        guard let primary = NSScreen.screens.first,
+              let screen = NSApp.windows.first(where: { $0.isVisible })?.screen,
+              screen != primary,
+              let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        else { return nil }
+        return CGDirectDisplayID(number.uint32Value)
     }
 
     /// The game hangs after quitting from its menu: its window stays (hidden)

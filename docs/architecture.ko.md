@@ -53,6 +53,7 @@ Dungeons-WinGDK-Shipping.exe
 |---|---|
 | `MACD2_WINEDEBUG` | `WINEDEBUG`를 바꿉니다(기본 `err+all,fixme-all`). |
 | `MACD2_MSYNC=0` | Mach 세마포어 동기화를 끕니다. |
+| `MACD2_ADAPTER_LOG=1` | mcd2 어댑터 진단 로그를 켜 둡니다(`session/http.log`, `runtime.log`). |
 | `XODUS_TRACE_QUERYAPI=1` | 프록시가 정품 런타임으로 넘기는 QueryApi 호출을 전부 기록합니다(양이 매우 많음). |
 
-로그는 `~/Library/Application Support/M(a)C Dungeons II/logs`에 있습니다.
+데이터 폴더의 `debug.env`에 한 줄에 하나씩 `KEY=VALUE`로 적어도 됩니다. 로그는 `~/Library/Application Support/M(a)C Dungeons II/logs`에 있습니다.

@@ -53,6 +53,7 @@ Adapter changes (`macos` branch of the [mcd2-crossover fork](https://github.com/
 |---|---|
 | `MACD2_WINEDEBUG` | Overrides `WINEDEBUG` (default `err+all,fixme-all`) |
 | `MACD2_MSYNC=0` | Turns off Mach-semaphore sync |
+| `MACD2_ADAPTER_LOG=1` | Keeps the mcd2 adapter's diagnostic log on (`session/http.log`, `runtime.log`) |
 | `XODUS_TRACE_QUERYAPI=1` | Logs every QueryApi call the proxy forwards to the genuine runtime (very noisy) |
 
-Logs are in `~/Library/Application Support/M(a)C Dungeons II/logs`.
+These can go in `debug.env` in the data folder (one `KEY=VALUE` per line). Logs are in `~/Library/Application Support/M(a)C Dungeons II/logs`.
