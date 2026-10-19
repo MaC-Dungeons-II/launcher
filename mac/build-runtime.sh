@@ -11,7 +11,7 @@
 # Inputs under $D2 (default .work/ in this repo, git-ignored):
 #   src-cx/wine         CodeWeavers crossover-sources 26.3.0, wine/ directory
 #                       (https://media.codeweavers.com/pub/crossover/source/)
-#                       with mac/patches/wine-*.patch and winemac-*.patch applied
+#                       with mac/patches/*.patch applied
 #   toolchain/llvm-mingw-*/bin   PE cross compiler (mstorsjo/llvm-mingw)
 #   toolchain/hostlibs/x86_64    x86_64 gnutls/freetype dylibs and their deps
 #   /opt/local                   MacPorts bison 3.x, gnutls/freetype headers

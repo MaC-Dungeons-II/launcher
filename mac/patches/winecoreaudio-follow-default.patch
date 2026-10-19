@@ -1,0 +1,151 @@
+--- a/dlls/winecoreaudio.drv/coreaudio.c
++++ b/dlls/winecoreaudio.drv/coreaudio.c
+@@ -85,6 +85,7 @@
+     AudioConverterRef converter;
+     AudioStreamBasicDescription dev_desc; /* audio unit format, not necessarily the same as fmt */
+     AudioDeviceID dev_id;
++    BOOL follow_default; /* plays on whatever macOS's default output is */
+ 
+     EDataFlow flow;
+     DWORD flags;
+@@ -500,7 +501,36 @@
+     return noErr;
+ }
+ 
+-static AudioComponentInstance get_audiounit(EDataFlow dataflow, AudioDeviceID adevid)
++static AudioDeviceID default_output_device(void)
++{
++    const AudioObjectPropertyAddress addr =
++    {
++        .mScope = kAudioObjectPropertyScopeGlobal,
++        .mElement = kAudioObjectPropertyElementMain,
++        .mSelector = kAudioHardwarePropertyDefaultOutputDevice,
++    };
++    AudioDeviceID id;
++    UInt32 size = sizeof(id);
++
++    if(AudioObjectGetPropertyData(kAudioObjectSystemObject, &addr, 0, NULL, &size, &id) != noErr)
++        return kAudioObjectUnknown;
++    return id;
++}
++
++/* The device a stream is playing on right now. */
++static AudioDeviceID stream_device(const struct coreaudio_stream *stream)
++{
++    AudioDeviceID id;
++
++    if(stream->follow_default && (id = default_output_device()) != kAudioObjectUnknown)
++        return id;
++    return stream->dev_id;
++}
++
++/* follow_default: a render unit that moves to the new default output when
++ * macOS switches it (headphones or a Bluetooth device connecting, the
++ * current device going away) instead of staying on adevid. */
++static AudioComponentInstance get_audiounit(EDataFlow dataflow, AudioDeviceID adevid, BOOL follow_default)
+ {
+     AudioComponentInstance unit;
+     AudioComponent comp;
+@@ -509,7 +539,7 @@
+ 
+     memset(&desc, 0, sizeof(desc));
+     desc.componentType = kAudioUnitType_Output;
+-    desc.componentSubType = kAudioUnitSubType_HALOutput;
++    desc.componentSubType = follow_default ? kAudioUnitSubType_DefaultOutput : kAudioUnitSubType_HALOutput;
+     desc.componentManufacturer = kAudioUnitManufacturer_Apple;
+ 
+     if(!(comp = AudioComponentFindNext(NULL, &desc))){
+@@ -544,6 +574,9 @@
+             return NULL;
+         }
+     }
++
++    if(follow_default)
++        return unit;
+ 
+     sc = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice,
+             kAudioUnitScope_Global, 0, &adevid, sizeof(adevid));
+@@ -753,7 +786,12 @@
+     if(params->share == AUDCLNT_SHAREMODE_EXCLUSIVE)
+         stream->bufsize_frames -= stream->bufsize_frames % stream->period_frames;
+ 
+-    if(!(stream->unit = get_audiounit(stream->flow, stream->dev_id))){
++    /* A shared render stream on the default output (or on a device that is
++     * gone) follows the default; Wine never tells the app it changed. */
++    stream->follow_default = stream->flow == eRender && stream->share == AUDCLNT_SHAREMODE_SHARED &&
++            (stream->dev_id == kAudioObjectUnknown || stream->dev_id == default_output_device());
++
++    if(!(stream->unit = get_audiounit(stream->flow, stream->dev_id, stream->follow_default))){
+         params->result = AUDCLNT_E_DEVICE_INVALIDATED;
+         goto end;
+     }
+@@ -1129,7 +1167,7 @@
+     AudioComponentInstance unit;
+     const AudioDeviceID dev_id = dev_id_from_device(params->device);
+ 
+-    unit = get_audiounit(params->flow, dev_id);
++    unit = get_audiounit(params->flow, dev_id, FALSE);
+ 
+     converter = NULL;
+     params->result = ca_setup_audiounit(params->flow, unit, params->fmt_in, &dev_desc, &converter);
+@@ -1269,6 +1307,7 @@
+ {
+     AudioObjectPropertyAddress addr;
+     AudioStreamID *ids;
++    const AudioDeviceID dev_id = stream_device(stream);
+     UInt32 size;
+     OSStatus sc;
+     int nstreams, i;
+@@ -1277,7 +1316,7 @@
+     addr.mElement = 0;
+     addr.mSelector = kAudioDevicePropertyStreams;
+ 
+-    sc = AudioObjectGetPropertyDataSize(stream->dev_id, &addr, 0, NULL, &size);
++    sc = AudioObjectGetPropertyDataSize(dev_id, &addr, 0, NULL, &size);
+     if(sc != noErr){
+         WARN("Unable to get size for _Streams property: %x\n", (int)sc);
+         return osstatus_to_hresult(sc);
+@@ -1287,7 +1326,7 @@
+     if(!ids)
+         return E_OUTOFMEMORY;
+ 
+-    sc = AudioObjectGetPropertyData(stream->dev_id, &addr, 0, NULL, &size, ids);
++    sc = AudioObjectGetPropertyData(dev_id, &addr, 0, NULL, &size, ids);
+     if(sc != noErr){
+         WARN("Unable to get _Streams property: %x\n", (int)sc);
+         free(ids);
+@@ -1332,7 +1371,7 @@
+     addr.mElement = 0;
+ 
+     size = sizeof(latency);
+-    sc = AudioObjectGetPropertyData(stream->dev_id, &addr, 0, NULL, &size, &latency);
++    sc = AudioObjectGetPropertyData(stream_device(stream), &addr, 0, NULL, &size, &latency);
+     if(sc != noErr){
+         WARN("Couldn't get _Latency property: %x\n", (int)sc);
+         os_unfair_lock_unlock(&stream->lock);
+@@ -1746,6 +1785,7 @@
+ {
+     struct set_volumes_params *params = args;
+     struct coreaudio_stream *stream = handle_get_stream(params->stream);
++    const AudioDeviceID dev_id = stream_device(stream);
+     Float32 level = params->master_volume;
+     OSStatus sc;
+     UINT32 i;
+@@ -1755,7 +1795,7 @@
+         kAudioObjectPropertyElementMain
+     };
+ 
+-    sc = AudioObjectSetPropertyData(stream->dev_id, &prop_addr, 0, NULL, sizeof(float), &level);
++    sc = AudioObjectSetPropertyData(dev_id, &prop_addr, 0, NULL, sizeof(float), &level);
+     if (sc == noErr)
+         level = 1.0f;
+     else
+@@ -1766,7 +1806,7 @@
+ 
+         prop_addr.mElement = i;
+ 
+-        sc = AudioObjectSetPropertyData(stream->dev_id, &prop_addr, 0, NULL, sizeof(float), &vol);
++        sc = AudioObjectSetPropertyData(dev_id, &prop_addr, 0, NULL, sizeof(float), &vol);
+         if (sc != noErr) {
+             WARN("Couldn't set channel #%u volume: %x\n", i, (int)sc);
+         }

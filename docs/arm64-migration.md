@@ -55,6 +55,8 @@ Open-source reference for the ARM64 Wine + FEX build and the loader signing: [Br
 2. Port our Wine patches:
    - `wine-dll-file-map.patch` (loader): needed for the encrypted executables.
    - `winemac-icon-mask.patch`: Dock icon.
+   - `winemac-primary-display.patch`: the game opens on the launcher's display.
+   - `winecoreaudio-follow-default.patch`: sound follows the macOS default output.
    - `wine-vulkan-soname-fallback.patch`: may no longer be needed.
 3. Rebuild the Unix-side dependencies for arm64: GStreamer (the official package is universal, so `bundle-gstreamer.sh` only needs `HOST_ARCH`), FFmpeg, SDL, gnutls, freetype, and DXMT's `winemetal.so` from source.
 4. Check the `MACD2_VIEW` RAM-disk path under ARM64 Wine. The game's anti-tamper re-reads its executable, and behavior under FEX is unknown.

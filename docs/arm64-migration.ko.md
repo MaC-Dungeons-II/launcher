@@ -55,6 +55,8 @@ ARM64 Wine + FEX 빌드와 로더 서명의 오픈소스 참고 자료: [Broyojo
 2. Wine 패치를 옮깁니다.
    - `wine-dll-file-map.patch`(로더): 암호화된 실행 파일에 필요합니다.
    - `winemac-icon-mask.patch`: Dock 아이콘
+   - `winemac-primary-display.patch`: 런처가 있는 화면에서 게임 열기
+   - `winecoreaudio-follow-default.patch`: macOS 기본 출력 장치 따라가기
    - `wine-vulkan-soname-fallback.patch`: 필요 없어질 수 있습니다.
 3. Unix 쪽 의존성을 arm64로 다시 빌드합니다.
    - GStreamer: 공식 패키지가 universal이라 `bundle-gstreamer.sh`에 `HOST_ARCH`만 주면 됩니다.
