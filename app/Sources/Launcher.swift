@@ -488,9 +488,10 @@ final class Launcher: ObservableObject {
         }
     }
 
-    /// The editor saves a layout as a download; it goes in the layout folder.
+    private lazy var keyEditor = KeyEditor(launcher: self)
+
     func openWasdEditor() {
-        NSWorkspace.shared.open(wasdBundle.appendingPathComponent("Keybinder.html"))
+        keyEditor.show()
     }
 
     func openWasdFolder() {
