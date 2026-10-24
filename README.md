@@ -47,6 +47,17 @@ What the app does:
 
 All data lives in `~/Library/Application Support/M(a)C Dungeons II`. To remove everything, delete the app, that folder, and the keychain item.
 
+## WASD controls (optional)
+
+The app includes [wasdmod](https://github.com/Wanzho/mcd2-wasd), which turns keyboard and mouse into an Xbox controller for the game: WASD to move, the mouse to aim. It is off by default.
+
+- Turn it on under **조작 → WASD 조작 (wasdmod)** in the menu bar. It applies from the next game launch.
+- **키 배치** picks the layout: the game's own keys, the author's recommended layout, or one you made.
+- **키 배치 편집기 열기…** opens the key layout editor in your browser. It saves a layout as a download. Move that file into the folder that **키 배치 폴더 열기** opens.
+- Hold left Option for the mouse cursor.
+
+It doesn't change game files or memory; it replaces the game's `xinput1_4.dll`. It is built from source (1.5.1, the version without the update check). It's a community mod, so use it at your own risk.
+
 ## How it works
 
 The game expects the Xbox GDK runtime. On a Mac, a few layers on top of Wine fill that in.
@@ -94,8 +105,9 @@ Order:
 2. `mac/build-runtime.sh` — Wine runtime
 3. Build the [mcd2-crossover fork](https://github.com/MaC-Dungeons-II/mcd2-crossover) with llvm-mingw → `xgameruntime.dll`, `XCurl.dll`
 4. `cargo build --release` in the [xodus fork](https://github.com/MaC-Dungeons-II/xodus)
-5. `app/build.sh` → app in `app/dist/`
-6. `app/dmg/make_dmg.sh` → `app/dist/MaC-Dungeons-II.dmg`
+5. `mac/build-wasdmod.sh` — wasdmod `xinput1_4.dll` (clone [Wanzho/mcd2-wasd](https://github.com/Wanzho/mcd2-wasd) into `.work/src-wasd` first)
+6. `app/build.sh` → app in `app/dist/`
+7. `app/dmg/make_dmg.sh` → `app/dist/MaC-Dungeons-II.dmg`
 
 To regenerate the app icon (Icon Composer format, Liquid Glass), run:
 
@@ -117,6 +129,7 @@ uv run --no-project --with pillow python app/icon/make_icon.py
 | xodus (`macd2`, `macd2-broker`) | [MaC-Dungeons-II/xodus](https://github.com/MaC-Dungeons-II/xodus) | GPL-3.0 |
 | Runtime proxy | [MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox](https://github.com/MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox) | LGPL-2.1+ |
 | Runtime adapter, XCurl wrapper | [MaC-Dungeons-II/mcd2-crossover](https://github.com/MaC-Dungeons-II/mcd2-crossover) | MIT |
+| wasdmod (optional WASD controls) | [Wanzho/mcd2-wasd](https://github.com/Wanzho/mcd2-wasd) 1.5.1, unmodified | MIT |
 | Wine | CodeWeavers crossover-sources 26.3 | LGPL-2.1+ |
 | DXMT, GDK-Proton, WineGDK, GStreamer, FFmpeg, SDL | see [app/NOTICE.md](app/NOTICE.md) | per project |
 
@@ -127,6 +140,7 @@ Changes in the forks are on their `macos` branches.
 - [xodus](https://github.com/xodus-gaming/xodus) — Microsoft sign-in, licenses, package downloads
 - [Flightdeck](https://github.com/marselnenaj/flightdeck-msfs-2024-linux-xbox) — GDK runtime proxy, Store broker
 - [mcd2-crossover](https://github.com/Wanzho/mcd2-crossover) — the adapter that made the genuine runtime usable
+- [wasdmod](https://github.com/Wanzho/mcd2-wasd) — keyboard and mouse as a controller
 - [WineGDK](https://github.com/Sightem/WineGDK), [GDK-Proton](https://github.com/LukasPAH/GDK-Proton-Custom) — GDK builtins
 - [DXMT](https://github.com/3Shain/dxmt) — Direct3D 11 → Metal
 - CodeWeavers, the Wine project

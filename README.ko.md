@@ -47,6 +47,17 @@ M4 MacBook(macOS 27)에서 확인했습니다.
 
 데이터는 전부 `~/Library/Application Support/M(a)C Dungeons II`에 있습니다. 지우려면 앱, 이 폴더, 키체인 항목을 삭제하면 됩니다.
 
+## WASD 조작 (선택)
+
+키보드와 마우스를 Xbox 컨트롤러처럼 쓰게 해 주는 [wasdmod](https://github.com/Wanzho/mcd2-wasd)가 들어 있습니다. WASD로 움직이고 마우스로 조준합니다. 기본값은 꺼짐입니다.
+
+- 메뉴 막대의 **조작 → WASD 조작 (wasdmod)** 에서 켭니다. 다음 게임 실행부터 적용됩니다.
+- **키 배치** 에서 배치를 고릅니다. 게임 기본 키, 제작자 추천 배치, 직접 만든 배치가 있습니다.
+- **키 배치 편집기 열기…** 를 누르면 브라우저에서 편집기가 열립니다. 저장한 배치는 다운로드로 받아지니, **키 배치 폴더 열기** 로 열리는 폴더에 옮겨 넣습니다.
+- 왼쪽 Option 키를 누르고 있으면 마우스 커서가 나옵니다.
+
+게임 파일이나 메모리는 건드리지 않고, 게임이 쓰는 `xinput1_4.dll`만 바꿔 끼웁니다. 소스에서 직접 빌드했습니다(1.5.1, 업데이트 확인 기능이 빠진 버전). 커뮤니티 모드라서 사용 책임은 본인에게 있습니다.
+
 ## 구조
 
 게임은 Xbox GDK 런타임을 기대합니다. Mac에서는 Wine 위에 레이어를 몇 겹 얹어서 맞춥니다.
@@ -94,8 +105,9 @@ macd2          로그인, 세션 갱신, 다운로드·풀기, 실행 (xodus)
 2. `mac/build-runtime.sh` — Wine 런타임
 3. [mcd2-crossover 포크](https://github.com/MaC-Dungeons-II/mcd2-crossover)를 llvm-mingw로 빌드 → `xgameruntime.dll`, `XCurl.dll`
 4. [xodus 포크](https://github.com/MaC-Dungeons-II/xodus)에서 `cargo build --release`
-5. `app/build.sh` → `app/dist/`에 앱 생성
-6. `app/dmg/make_dmg.sh` → `app/dist/MaC-Dungeons-II.dmg` 생성
+5. `mac/build-wasdmod.sh` — wasdmod `xinput1_4.dll` (먼저 [Wanzho/mcd2-wasd](https://github.com/Wanzho/mcd2-wasd)를 `.work/src-wasd`에 clone)
+6. `app/build.sh` → `app/dist/`에 앱 생성
+7. `app/dmg/make_dmg.sh` → `app/dist/MaC-Dungeons-II.dmg` 생성
 
 앱 아이콘(Icon Composer 형식, Liquid Glass)을 다시 만들려면 다음을 실행합니다.
 
@@ -117,6 +129,7 @@ uv run --no-project --with pillow python app/icon/make_icon.py
 | xodus (`macd2`, `macd2-broker`) | [MaC-Dungeons-II/xodus](https://github.com/MaC-Dungeons-II/xodus) | GPL-3.0 |
 | 런타임 프록시 | [MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox](https://github.com/MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox) | LGPL-2.1+ |
 | 런타임 어댑터, XCurl 래퍼 | [MaC-Dungeons-II/mcd2-crossover](https://github.com/MaC-Dungeons-II/mcd2-crossover) | MIT |
+| wasdmod (선택 기능, WASD 조작) | [Wanzho/mcd2-wasd](https://github.com/Wanzho/mcd2-wasd) 1.5.1, 수정 없음 | MIT |
 | Wine | CodeWeavers crossover-sources 26.3 | LGPL-2.1+ |
 | DXMT, GDK-Proton, WineGDK, GStreamer, FFmpeg, SDL | [app/NOTICE.md](app/NOTICE.md) 참고 | 각 프로젝트 |
 
@@ -127,6 +140,7 @@ uv run --no-project --with pillow python app/icon/make_icon.py
 - [xodus](https://github.com/xodus-gaming/xodus) — Microsoft 로그인, 라이선스, 패키지 다운로드
 - [Flightdeck](https://github.com/marselnenaj/flightdeck-msfs-2024-linux-xbox) — GDK 런타임 프록시, Store 브로커
 - [mcd2-crossover](https://github.com/Wanzho/mcd2-crossover) — 정품 런타임을 쓰게 해 준 어댑터
+- [wasdmod](https://github.com/Wanzho/mcd2-wasd) — 키보드·마우스를 컨트롤러로
 - [WineGDK](https://github.com/Sightem/WineGDK), [GDK-Proton](https://github.com/LukasPAH/GDK-Proton-Custom) — GDK 빌트인
 - [DXMT](https://github.com/3Shain/dxmt) — Direct3D 11 → Metal
 - CodeWeavers, Wine 프로젝트

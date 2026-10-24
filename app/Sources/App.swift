@@ -13,10 +13,28 @@ struct MaCDungeonsApp: App {
                 .frame(width: 440, height: 150)
                 .onAppear {
                     delegate.launcher = launcher
+                    launcher.refreshWasdLayouts()
                     launcher.start()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                    launcher.refreshWasdLayouts()   // layouts dropped into the folder show up
                 }
         }
         .windowResizability(.contentSize)
+        .commands {
+            CommandMenu("조작") {
+                Toggle("WASD 조작 (wasdmod)", isOn: $launcher.wasdEnabled)
+                Picker("키 배치", selection: $launcher.wasdLayout) {
+                    ForEach(launcher.wasdLayouts, id: \.self) { Text(Launcher.wasdLayoutTitle($0)).tag($0) }
+                }
+                .disabled(!launcher.wasdEnabled)
+                Divider()
+                Button("키 배치 편집기 열기…") { launcher.openWasdEditor() }
+                Button("키 배치 폴더 열기") { launcher.openWasdFolder() }
+                Divider()
+                Text("바꾼 설정은 다음 게임 실행부터 적용돼요")
+            }
+        }
     }
 }
 

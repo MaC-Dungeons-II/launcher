@@ -18,6 +18,7 @@ with your account's license.
 | WineGDK (Sightem/WineGDK b5d23b0) + Flightdeck runtime patch: gameinput, xodus_store_test | LGPL-2.1-or-later | built by mac/build-store-bridge.sh |
 | Flightdeck runtime proxy (marselnenaj/flightdeck-msfs-2024-linux-xbox) | LGPL-2.1-or-later | modified for this launcher |
 | mcd2-crossover adapter and curl wrapper (Wanzho/mcd2-crossover) | MIT | modified for this launcher |
+| wasdmod 1.5.1 xinput1_4.dll, layouts, key layout editor (Wanzho/mcd2-wasd da3c591) | MIT | unmodified, Nexus flavor (no update check), built by mac/build-wasdmod.sh |
 | xodus (xodus-gaming/xodus), shipped as `macd2` / `macd2-broker` | GPL-3.0 | modified: mac-fetch, mac-session, keychain/socket names |
 
 ## Downloaded on first run (not bundled)

@@ -8,6 +8,7 @@
 #   build-fd/runtime/xgameruntime.dll   Flightdeck proxy (mac chain patches)
 #   src-mcd2/build/{xgameruntime,XCurl}.dll  mcd2-crossover adapter + curl wrapper (patched)
 #   src-xodus/xodus/target/release/{xodus-cli,xodus-service}  xodus (mac-fetch, mac-session)
+#   wasdmod/                        wasdmod xinput1_4.dll + layouts + key editor (mac/build-wasdmod.sh)
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -36,6 +37,10 @@ cp "$D2/build-fd/runtime/xgameruntime.dll" "$R/layer/xgameruntime-native.dll"
 cp "$D2/src-mcd2/build/xgameruntime.dll" "$R/layer/xgameruntime.dll"
 cp "$D2/src-mcd2/build/XCurl.dll" "$R/layer/XCurl.dll"
 
+echo "== wasdmod (optional, off by default)"
+mkdir -p "$R/wasdmod"
+cp "$D2"/wasdmod/{xinput1_4.dll,default.txt,author.txt,Keybinder.html} "$R/wasdmod/"
+
 echo "== helpers"
 cp "$D2/src-xodus/xodus/target/release/xodus-cli" "$R/bin/macd2"
 cp "$D2/src-xodus/xodus/target/release/xodus-service" "$R/bin/macd2-broker"
@@ -43,6 +48,7 @@ cp "$D2/src-xodus/xodus/target/release/xodus-service" "$R/bin/macd2-broker"
 echo "== licenses"
 cp "$D2/src-xodus/xodus/LICENSE" "$R/licenses/xodus-GPL-3.0.txt"
 cp "$D2/src-mcd2/LICENSE" "$R/licenses/mcd2-crossover-MIT.txt"
+cp "$D2/wasdmod/LICENSE" "$R/licenses/wasdmod-MIT.txt"
 cp "$D2/src-cx/wine/COPYING.LIB" "$R/licenses/wine-LGPL-2.1.txt" 2>/dev/null || true
 cp "$D2/src-cx/wine/LICENSE" "$R/licenses/wine-LICENSE.txt" 2>/dev/null || true
 cp "$D2/src-ffmpeg/ffmpeg-7.1.1/COPYING.LGPLv2.1" "$R/licenses/ffmpeg-LGPL-2.1.txt"
