@@ -41,6 +41,15 @@ struct MaCDungeonsApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     weak var launcher: Launcher?
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// While playing, the game is asked to close first; the launcher replies
+    /// once it has (Wine is stopped after 20 s if it hasn't).
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        MainActor.assumeIsolated {
+            guard let launcher, launcher.gameRunning else { return .terminateNow }
+            launcher.quitAfterGame()
+            return .terminateLater
+        }
+    }
     func applicationWillTerminate(_ notification: Notification) {
         // stops Wine first if the game is still running, then helpers and other children
         MainActor.assumeIsolated { launcher?.shutdown() }

@@ -19,10 +19,10 @@ final class Launcher: ObservableObject {
     /// wasdmod (keyboard and mouse as a controller) and its key layout; both
     /// apply from the next game launch.
     @Published var wasdEnabled = UserDefaults.standard.bool(forKey: "wasdmod.enabled") {
-        didSet { UserDefaults.standard.set(wasdEnabled, forKey: "wasdmod.enabled") }
+        didSet { UserDefaults.standard.set(wasdEnabled, forKey: "wasdmod.enabled"); if wasdEnabled != oldValue { offerRestart() } }
     }
     @Published var wasdLayout = UserDefaults.standard.string(forKey: "wasdmod.layout") ?? Launcher.wasdDefaultLayout {
-        didSet { UserDefaults.standard.set(wasdLayout, forKey: "wasdmod.layout") }
+        didSet { UserDefaults.standard.set(wasdLayout, forKey: "wasdmod.layout"); if wasdLayout != oldValue { offerRestart() } }
     }
     @Published private(set) var wasdLayouts: [String] = []
 
@@ -68,6 +68,13 @@ final class Launcher: ObservableObject {
     /// Wine may be running (prefix setup or the game); quitting must stop it.
     private var usedWine = false
     private var wasdPresetsCopied = false
+    /// The game process (`macd2 run`) is running, with this environment.
+    private(set) var gameRunning = false
+    private var gameEnv: [String: String]? = nil
+    private var stoppingGame = false
+    private var restartPending = false
+    private var quitPending = false
+    private var restartPromptOpen = false
 
     // MARK: - Flow
 
@@ -726,11 +733,17 @@ final class Launcher: ObservableObject {
         let adapterLog = Task { await self.keepAdapterLogging() }
         // xodus decrypts the encrypted executable into memory with the
         // account's license on every launch; nothing is written decrypted.
+        gameRunning = true
+        gameEnv = env
         let code = await runProcess(cli,
                                     ["run", game.path, wineBin.path,
                                      "--exe", "\\Dungeons\\Binaries\\WinGDK\\\(Self.gameExe)",
                                      "--", "-dx11"],
                                     env: env, cwd: gameBinaries, log: "game.log")
+        gameRunning = false
+        gameEnv = nil
+        let stoppedByLauncher = stoppingGame
+        stoppingGame = false
         watchdog.cancel()
         adapterLog.cancel()
         let stoppedByWatchdog = await watchdog.value
@@ -738,11 +751,69 @@ final class Launcher: ObservableObject {
         await killWineServer(env: env, log: "game.log")
         usedWine = false
         stopHelpers()
-        // After the watchdog's `wineserver -k` the exit status is not an error.
-        if code != 0 && code != 1 && !stoppedByWatchdog {
+        if quitPending {
+            NSApp.reply(toApplicationShouldTerminate: true)
+            return
+        }
+        if restartPending {
+            restartPending = false
+            appendLog("game.log", "launcher: restarting the game")
+            start()
+            return
+        }
+        // After the watchdog's or the launcher's stop the exit status is not an error.
+        if code != 0 && code != 1 && !stoppedByWatchdog && !stoppedByLauncher {
             fail("게임이 비정상 종료됐어요 (코드 \(code)).")
         } else {
             NSApp.terminate(nil)
+        }
+    }
+
+    /// Asks the game to close the way Windows does (taskkill without /f posts
+    /// WM_CLOSE to its windows), and stops Wine only if the game is still
+    /// running after 20 s. launch() continues when the game process ends.
+    func stopGame() {
+        guard gameRunning, !stoppingGame, let env = gameEnv else { return }
+        stoppingGame = true
+        set("게임 종료 중…", "게임에 종료 신호를 보냈어요")
+        Task {
+            appendLog("game.log", "launcher: asking the game to close (WM_CLOSE)")
+            await runProcess(wineBin, ["taskkill", "/im", Self.gameExe], env: env, log: "game.log")
+            let deadline = Date().addingTimeInterval(20)
+            while gameRunning && Date() < deadline { try? await Task.sleep(nanoseconds: 250_000_000) }
+            if gameRunning {
+                appendLog("game.log", "launcher: the game did not close within 20 s; stopping Wine")
+                await killWineServer(env: env, log: "game.log")
+            }
+        }
+    }
+
+    /// Quitting the app while playing: close the game first, then let AppKit
+    /// finish quitting (applicationShouldTerminate returned .terminateLater).
+    func quitAfterGame() {
+        quitPending = true
+        restartPending = false
+        stopGame()
+    }
+
+    /// A WASD setting changed while playing: it applies on the next launch,
+    /// so offer to restart the game now.
+    private func offerRestart() {
+        guard gameRunning, !stoppingGame, !restartPromptOpen else { return }
+        restartPromptOpen = true
+        Task { @MainActor in
+            let alert = NSAlert()
+            alert.messageText = "게임을 지금 다시 시작할까요?"
+            alert.informativeText = "WASD 조작 설정은 게임을 다시 시작해야 적용돼요. 게임에 종료 신호를 보내고, 닫히면 바로 다시 실행해요."
+            alert.addButton(withTitle: "다시 시작")
+            alert.addButton(withTitle: "나중에")
+            NSApp.activate()
+            let restart = alert.runModal() == .alertFirstButtonReturn
+            restartPromptOpen = false
+            if restart && gameRunning && !quitPending {
+                restartPending = true
+                stopGame()
+            }
         }
     }
 
