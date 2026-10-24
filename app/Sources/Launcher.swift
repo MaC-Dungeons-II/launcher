@@ -19,10 +19,10 @@ final class Launcher: ObservableObject {
     /// wasdmod (keyboard and mouse as a controller) and its key layout; both
     /// apply from the next game launch.
     @Published var wasdEnabled = UserDefaults.standard.bool(forKey: "wasdmod.enabled") {
-        didSet { UserDefaults.standard.set(wasdEnabled, forKey: "wasdmod.enabled"); if wasdEnabled != oldValue { offerRestart() } }
+        didSet { UserDefaults.standard.set(wasdEnabled, forKey: "wasdmod.enabled"); if wasdEnabled != oldValue { offerRestart(Self.wasdRestartMessage) } }
     }
     @Published var wasdLayout = UserDefaults.standard.string(forKey: "wasdmod.layout") ?? Launcher.wasdDefaultLayout {
-        didSet { UserDefaults.standard.set(wasdLayout, forKey: "wasdmod.layout"); if wasdLayout != oldValue { offerRestart() } }
+        didSet { UserDefaults.standard.set(wasdLayout, forKey: "wasdmod.layout"); if wasdLayout != oldValue { offerRestart(Self.wasdRestartMessage) } }
     }
     @Published private(set) var wasdLayouts: [String] = []
 
@@ -56,6 +56,7 @@ final class Launcher: ObservableObject {
     var wasdBundle: URL { resources.appendingPathComponent("wasdmod") }
     var wasdData: URL { data.appendingPathComponent("wasdmod") }
     static let wasdDefaultLayout = "default.txt"
+    static let wasdRestartMessage = "WASD 조작 설정은 게임을 다시 시작해야 적용돼요. 게임에 종료 신호를 보내고, 닫히면 바로 다시 실행해요."
     static let brokerSocket = "/tmp/macd2.sock"
     static let rotatedLogs = ["game.log", "fetch.log", "broker.log", "session.log", "prefix.log", "wasdmod.log"]
 
@@ -151,6 +152,7 @@ final class Launcher: ObservableObject {
             try await ensureDependencies()
             try await ensureGame()
             try overlayLayer()
+            applyPendingGameControls()
             try applyWasdmod()
             try await ensurePrefix()
             try await launch()
@@ -484,8 +486,19 @@ final class Launcher: ObservableObject {
         switch name {
         case "default.txt": return "공식 (게임 기본 키)"
         case "author.txt": return "추천 (wasdmod 제작자)"
-        default: return name
+        default: return wasdLayoutNames[name] ?? name
         }
+    }
+
+    /// Names of the player's layouts (their files have ASCII names).
+    static var wasdLayoutNames: [String: String] {
+        UserDefaults.standard.dictionary(forKey: "wasdmod.names") as? [String: String] ?? [:]
+    }
+
+    static func setWasdLayoutName(_ file: String, _ name: String?) {
+        var names = wasdLayoutNames
+        names[file] = name
+        UserDefaults.standard.set(names, forKey: "wasdmod.names")
     }
 
     private lazy var keyEditor = KeyEditor(launcher: self)
@@ -509,6 +522,7 @@ final class Launcher: ObservableObject {
         }
         guard wasdEnabled else { return }
         refreshWasdLayouts()
+        resaveWasdLayoutForGame()
         try replace(gameBinaries.appendingPathComponent("xinput1_4.dll"), with: wasdBundle.appendingPathComponent("xinput1_4.dll"))
         try fm.createSymbolicLink(at: gameBinaries.appendingPathComponent(wasdLayout),
                                   withDestinationURL: wasdData.appendingPathComponent(wasdLayout))
@@ -752,6 +766,7 @@ final class Launcher: ObservableObject {
         await killWineServer(env: env, log: "game.log")
         usedWine = false
         stopHelpers()
+        applyPendingGameControls()
         if quitPending {
             NSApp.reply(toApplicationShouldTerminate: true)
             return
@@ -797,15 +812,15 @@ final class Launcher: ObservableObject {
         stopGame()
     }
 
-    /// A WASD setting changed while playing: it applies on the next launch,
-    /// so offer to restart the game now.
-    private func offerRestart() {
+    /// A change that applies on the next launch (a WASD setting, the game's
+    /// own key settings) was made while playing: offer to restart the game now.
+    func offerRestart(_ message: String) {
         guard gameRunning, !stoppingGame, !restartPromptOpen else { return }
         restartPromptOpen = true
         Task { @MainActor in
             let alert = NSAlert()
             alert.messageText = "게임을 지금 다시 시작할까요?"
-            alert.informativeText = "WASD 조작 설정은 게임을 다시 시작해야 적용돼요. 게임에 종료 신호를 보내고, 닫히면 바로 다시 실행해요."
+            alert.informativeText = message
             alert.addButton(withTitle: "다시 시작")
             alert.addButton(withTitle: "나중에")
             NSApp.activate()
@@ -900,6 +915,8 @@ final class Launcher: ObservableObject {
             return ((w[kCGWindowBounds as String] as? [String: Double])?["Width"] ?? 0) > 200
         }.count
     }
+
+    func appendGameLog(_ line: String) { appendLog("game.log", line) }
 
     private func appendLog(_ name: String, _ line: String) {
         guard let h = logHandle(name) else { return }

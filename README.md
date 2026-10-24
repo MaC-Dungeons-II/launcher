@@ -53,8 +53,8 @@ The app includes [wasdmod](https://github.com/Wanzho/mcd2-wasd), which turns key
 
 - Turn it on under **조작 → WASD 조작 (wasdmod)** in the menu bar. It applies from the next game launch.
 - **키 배치** picks the layout: the game's own keys, the author's recommended layout, or one you made.
-- **키 배치 편집기 열기…** opens the key layout editor. Saving there adds the layout and selects it.
-- The editor can also change the game's own keyboard settings to match the layout, so menus use the same keys. The game has to be closed, and it has to have saved its key settings once (change any key under Settings › Controls › Keyboard). The Launcher edition keeps them in its local save store, so each change first copies that store to `wasdmod/backups` in the data folder.
+- **키 배치 편집기 열기…** opens the key layout editor, a native port of wasdmod's editor. Editing a preset saves it as a new layout of your own.
+- **대신 바꾸기** in the editor changes the game's own keyboard settings to match the layout, so menus use the same keys. While the game runs, the launcher offers to restart it and makes the change while it's closed. The game has to have saved its key settings once (change any key under Settings › Controls › Keyboard). The Launcher edition keeps them in its local save store, so each change first copies that store to `wasdmod/backups` in the data folder.
 - Hold left Option for the mouse cursor.
 
 It doesn't change game files or memory; it replaces the game's `xinput1_4.dll`. It is built from source (1.5.1, the version without the update check). It's a community mod, so use it at your own risk.

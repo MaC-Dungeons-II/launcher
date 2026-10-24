@@ -6,7 +6,7 @@
 # Inputs under $D2 (default .work/ in this repo):
 #   src-wasd            git clone of Wanzho/mcd2-wasd at $WASD_COMMIT
 #   toolchain/llvm-mingw-*/bin/lld-link
-# Output: $D2/wasdmod/{xinput1_4.dll,default.txt,author.txt,Keybinder.html,LICENSE}
+# Output: $D2/wasdmod/{xinput1_4.dll,default.txt,author.txt,ko.json,LICENSE}
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -28,7 +28,7 @@ mkdir -p build
 grep -E "^printf 'LIBRARY (KERNEL32|USER32|GDI32)\.dll" build.sh | sh
 for l in kernel32 user32 gdi32; do "$LLD" /lib /machine:x64 /def:build/$l.def /out:build/$l.lib >/dev/null; done
 
-# Translation tables (build/lang_game.h) and the key layout editor (Keybinder.html)
+# Translation tables (build/lang_game.h)
 WASDMOD_FLAVOR=nexus WASDMOD_VERSION=$VERSION uv run --no-project python lang.py
 
 CFLAGS="-DVERSION=\"$VERSION\" -DNEXUS --target=x86_64-pc-windows-msvc -O2 -fno-stack-protector -fno-builtin -Wall -Wno-incompatible-pointer-types -Wno-int-conversion"
@@ -38,5 +38,6 @@ CFLAGS="-DVERSION=\"$VERSION\" -DNEXUS --target=x86_64-pc-windows-msvc -O2 -fno-
 rm -f build/*.obj build/*.exp build/xinput1_4.lib
 
 mkdir -p "$OUT"
-cp build/xinput1_4.dll default.txt author.txt Keybinder.html LICENSE "$OUT/"
+cp build/xinput1_4.dll default.txt author.txt LICENSE "$OUT/"
+cp lang/ko.json "$OUT/ko.json"   # the key layout editor's Korean (KeyEditor.swift)
 echo "BUILT $OUT ($(shasum -a 256 "$OUT/xinput1_4.dll" | cut -c1-16)…)"

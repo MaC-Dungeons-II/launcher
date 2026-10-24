@@ -8,7 +8,7 @@
 #   build-fd/runtime/xgameruntime.dll   Flightdeck proxy (mac chain patches)
 #   src-mcd2/build/{xgameruntime,XCurl}.dll  mcd2-crossover adapter + curl wrapper (patched)
 #   src-xodus/xodus/target/release/{xodus-cli,xodus-service}  xodus (mac-fetch, mac-session)
-#   wasdmod/                        wasdmod xinput1_4.dll + layouts + key editor (mac/build-wasdmod.sh)
+#   wasdmod/                        wasdmod xinput1_4.dll, layouts, Korean texts (mac/build-wasdmod.sh)
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -39,7 +39,7 @@ cp "$D2/src-mcd2/build/XCurl.dll" "$R/layer/XCurl.dll"
 
 echo "== wasdmod (optional, off by default)"
 mkdir -p "$R/wasdmod"
-cp "$D2"/wasdmod/{xinput1_4.dll,default.txt,author.txt,Keybinder.html} "$R/wasdmod/"
+cp "$D2"/wasdmod/{xinput1_4.dll,default.txt,author.txt,ko.json} "$R/wasdmod/"
 
 echo "== helpers"
 cp "$D2/src-xodus/xodus/target/release/xodus-cli" "$R/bin/macd2"
