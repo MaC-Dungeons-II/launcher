@@ -109,7 +109,7 @@
       case "working":
         if (t && t.phase === "download")
           return Object.assign(base, { state: "Downloading", currentBytes: t.done, totalBytes: t.total,
-                                       note: speedText(t) });
+                                       note: etaText(t), speed: t.speed });
         return Object.assign(base, { state: t ? "Finalizing" : "Preparing", note: a.status });
       case "paused":
         return Object.assign(base, { state: "Paused", currentBytes: t ? t.done : 0, totalBytes: t ? t.total : 0 });
@@ -125,14 +125,14 @@
     }
   }
   function t_(k) { return t(k); }
-  // "21 MB/s, 약 7분 남음", shown in parentheses after the byte counts
-  // (nothing until the app has a steady speed)
-  function speedText(tr) {
+  // Time left while downloading; the patched bar puts the speed before it in
+  // the launcher's own byte format: "(21 MB/s, 약 7분 남음)". Nothing until
+  // the app has a steady speed.
+  function etaText(tr) {
     if (!tr.speed) return null;
-    var left = Math.max(tr.total - tr.done, 0) / tr.speed, min = Math.ceil(left / 60);
-    var mb = tr.speed / 1e6, rate = (mb >= 10 ? mb.toFixed(0) : mb.toFixed(1)) + " MB/s";
-    if (korean()) return rate + ", " + (min > 1 ? "약 " + min + "분 남음" : "1분 이내");
-    return rate + ", " + (min > 1 ? "about " + min + " min left" : "under a minute");
+    var min = Math.ceil(Math.max(tr.total - tr.done, 0) / tr.speed / 60);
+    if (korean()) return min > 1 ? "약 " + min + "분 남음" : "1분 이내";
+    return min > 1 ? "about " + min + " min left" : "under a minute";
   }
   function post(cmd) {
     fetch(APP + "/" + cmd, { method: "POST" }).catch(function (e) { console.log("macd2: " + e); });
@@ -152,7 +152,7 @@
         onResume: function () { post("resume"); },
         onCancel: function () { post("cancel"); },
         // the app's own words stand alone (patched bar text, see mclauncher-link.py)
-        additionalStateText: function () { return d.note ? { macd2: true, text: d.note } : null; },
+        additionalStateText: function () { return d.note ? { macd2: true, text: d.note, speed: d.speed } : null; },
       });
     };
     return R.createElement(Bar, { key: "macd2ProgressBar" });
