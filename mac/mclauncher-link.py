@@ -9,8 +9,9 @@ the UI so that
   (launchd socket activation; nothing runs until a request, and only requests
   from https://mojang are honoured) opens M(a)C Dungeons II.app hidden. The
   launcher drops non-http popups, so macd2:// cannot be opened directly;
-- while the app runs, its state (progress, sign-in, errors, playing) replaces
-  the button, from the app's http://127.0.0.1:47822 (MCLauncherLink.swift);
+- while the app runs, its state (from http://127.0.0.1:47822, MCLauncherLink.swift)
+  shows in the launcher's own download bar and Play button, as Java Edition's
+  downloads do;
 - the "not playable" alert and "Where is the play button" panel point to this
   project instead (mclauncher-link.js holds the injected code and texts).
 Ownership (`ownsGame`) is untouched: the button still needs the account's own
@@ -130,9 +131,14 @@ BUTTON = [
     ("F=!!X&&X.isInstalled", 'F="dungeons2"===e||!!X&&X.isInstalled'),
     ("_=(0,c.useCallback)(((e,a)=>{(0,r.YW)(Q,{play:",
      '_=(0,c.useCallback)(((e,a)=>{if("dungeons2"===Y.productId)return void window.__macd2();(0,r.YW)(Q,{play:'),
-    # while M(a)C Dungeons II runs, its state replaces the button (mclauncher-link.js)
-    ('a(_,J,L,O,F))};a.d(t,["A",0,E])', 'window.__macd2Wrap(c,e,a(_,J,L,O,F)))};a.d(t,["A",0,E])'),
+    # while M(a)C Dungeons II works or the game runs, the button shows it (mclauncher-link.js)
+    ("const E=({productId:e,versionId:t,render:a})=>{var E,h,b,x,C,w,y,M,f,v;",
+     "const E=({productId:e,versionId:t,render:a})=>{var E,h,b,x,C,w,y,M,f,v;const MD=window.__macd2Use(c,e);"),
+    ('a(_,J,L,O,F))};a.d(t,["A",0,E])', 'a(_,MD||J,L,O,F))};a.d(t,["A",0,E])'),
 ]
+# the app's progress in the launcher's download bar (every product's bar is listed here)
+BAR = ("return n.createElement(n.Fragment,null,t)}},2735(",
+       "return n.createElement(n.Fragment,null,t,window.__macd2Bar(n,s.M))}},2735(")
 ROUTED = re.compile(r"\b(play|download|hardRepair):([A-Za-z$_][\w$]*)\.(launchProduct|installProduct|repairProduct),")
 
 
@@ -141,6 +147,9 @@ def patch_button(src: str) -> str:
     if all(old in src for old, _ in BUTTON):
         for old, new in BUTTON:
             src = src.replace(old, new, 1)
+        changed = True
+    if BAR[0] in src:
+        src = src.replace(*BAR, 1)
         changed = True
     for old, new in NOTICES:
         if old in src:

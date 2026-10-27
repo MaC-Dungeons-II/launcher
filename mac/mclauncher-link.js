@@ -1,6 +1,7 @@
 // Injected at the top of Minecraft Launcher's main bundle by mclauncher-link.py.
-// Dungeons II only: Play goes to M(a)C Dungeons II, whose state then replaces
-// the Play button (from the app's http://127.0.0.1:47822/status).
+// Dungeons II only: Play goes to M(a)C Dungeons II, whose state (from the app's
+// http://127.0.0.1:47822/status) then drives the Play button and the
+// launcher's own download bar, as Minecraft: Java Edition's downloads do.
 (function () {
   var APP = "http://127.0.0.1:47822";
   // the launcher's own language setting (CEF runs with --lang=en-US)
@@ -12,79 +13,113 @@
       banner: "Minecraft Dungeons II는 비공식 Mac 포팅 런처 M(a)C Dungeons II를 통해 실행돼요.",
       head: "Mac에서 플레이하기",
       body: "플레이를 누르면 비공식 포팅 런처 M(a)C Dungeons II가 게임을 실행해요. Mojang·Microsoft와 관계없는 프로젝트라, 문제는 저장소에 알려 주세요.",
-      repo: "저장소 바로가기", stop: "게임 종료", show: "M(a)C Dungeons II 열기", retry: "다시 시도",
+      repo: "저장소 바로가기", starting: "M(a)C Dungeons II 시작 중",
     },
     en: {
       banner: "Minecraft Dungeons II runs on this Mac through M(a)C Dungeons II, an unofficial port.",
       head: "Playing on Mac",
       body: "Play starts the game through M(a)C Dungeons II, an unofficial port not affiliated with Mojang or Microsoft. Please report problems on our repository.",
-      repo: "Open our repo", stop: "Quit game", show: "Open M(a)C Dungeons II", retry: "Try again",
+      repo: "Open our repo", starting: "Starting M(a)C Dungeons II",
     },
   };
   function t(k) { return (korean() ? TEXT.ko : TEXT.en)[k]; }
   window.__macd2Repo = "https://github.com/MaC-Dungeons-II/launcher";
   window.__macd2T = t;
 
+  // M(a)C Dungeons II's state, shared by the Play button and the download bar.
+  // Polled from the app while anything shows it; `pending` covers the seconds
+  // between Play and the app answering.
+  var state = { app: null, pending: 0 }, listeners = [], timer = 0;
+  function emit() { listeners.slice().forEach(function (f) { f(state); }); }
+  function poll() {
+    clearTimeout(timer);
+    if (!listeners.length) { timer = 0; return; }
+    fetch(APP + "/status", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        state = { app: j, pending: j.stage === "idle" ? state.pending : 0 };
+        return 1000;
+      }, function () {
+        state = { app: null, pending: state.pending };
+        return state.pending ? 1000 : 3000;   // not running (yet)
+      })
+      .then(function (ms) {
+        if (state.pending && Date.now() - state.pending > 30000) state.pending = 0;
+        emit();
+        timer = setTimeout(poll, ms);
+      });
+  }
+  function subscribe(f) {
+    listeners.push(f);
+    if (!timer) poll();
+    return function () { listeners = listeners.filter(function (g) { return g !== f; }); };
+  }
+  function useAppState(R, on) {
+    var st = R.useState(state), set = st[1];
+    R.useEffect(function () { return on ? subscribe(set) : undefined; }, [on]);
+    return on ? st[0] : null;
+  }
+
   // Play: a launchd agent on PORT opens the app (the launcher drops macd2:// popups)
   window.__macd2 = function () {
     console.log("macd2: play");
+    state = { app: state.app, pending: Date.now() };
+    emit();
     fetch("http://127.0.0.1:__PORT__/play", { method: "POST", mode: "no-cors" })
       .catch(function (e) { console.log("macd2: " + e); });
+    if (!timer && listeners.length) poll();
     return Promise.resolve();
   };
-  function post(cmd) {
-    fetch(APP + "/" + cmd, { method: "POST" }).catch(function (e) { console.log("macd2: " + e); });
-  }
 
-  var Status = null;
-  // R is the page's React (passed from the patched button module)
-  window.__macd2Wrap = function (R, productId, button) {
-    if (productId !== "dungeons2") return button;
-    if (!Status) Status = makeStatus(R);
-    return R.createElement(Status, { button: button });
+  // The Play button's instance state while the app works or the game runs
+  // (Downloading and Running disable it, as for Minecraft: Java Edition).
+  window.__macd2Use = function (R, productId) {
+    var s = useAppState(R, productId === "dungeons2");
+    if (!s) return null;
+    if (s.pending) return "Downloading";
+    if (!s.app) return null;
+    if (s.app.stage === "working") return "Downloading";
+    if (s.app.stage === "playing") return "Running";
+    return null;
   };
 
-  function makeStatus(R) {
-    var h = R.createElement;
-    return function (props) {
-      var st = R.useState(null), s = st[0], set = st[1];
-      R.useEffect(function () {
-        var alive = true, timer = 0;
-        function tick() {
-          fetch(APP + "/status", { cache: "no-store" })
-            .then(function (r) { return r.json(); })
-            .then(function (j) { if (alive) set(j); return 1000; },
-                  function () { if (alive) set(null); return 3000; })   // app not running
-            .then(function (ms) { if (alive) timer = setTimeout(tick, ms); });
-        }
-        tick();
-        return function () { alive = false; clearTimeout(timer); };
-      }, []);
-      if (!s || s.stage === "idle") return props.button;
-
-      var action = s.stage === "playing" ? "stop" : s.stage === "failed" ? "retry"
-                 : s.stage === "working" ? null : "show";
-      var pct = typeof s.progress === "number" ? Math.max(0, Math.min(100, s.progress * 100)) : null;
-      return h("div", {
-        "data-testid": "macd2-status",
-        style: { display: "flex", flexDirection: "column", gap: "6px", width: "360px", maxWidth: "90vw",
-                 padding: "10px 16px", boxSizing: "border-box", background: "#1e1e1f",
-                 border: "2px solid #3c8527", color: "#fff", fontFamily: '"Noto Sans", sans-serif' }
-      },
-        h("div", { style: { display: "flex", alignItems: "center", gap: "12px" } },
-          h("div", { style: { flex: "1 1 auto", fontSize: "15px", fontWeight: 600, overflow: "hidden",
-                              textOverflow: "ellipsis", whiteSpace: "nowrap" } }, s.status),
-          action && h("button", {
-            type: "button", onClick: function () { post(action); },
-            style: { flex: "0 0 auto", background: "#3c8527", color: "#fff", border: "none",
-                     padding: "4px 10px", fontSize: "13px", cursor: "pointer" }
-          }, t(action))),
-        pct !== null && h("div", { style: { height: "6px", background: "#48494a" } },
-          h("div", { style: { height: "100%", width: pct + "%", background: "#3c8527",
-                              transition: "width .5s" } })),
-        s.detail && h("div", { style: { fontSize: "12px", color: "#b1b2b5", overflow: "hidden",
-                                        textOverflow: "ellipsis", whiteSpace: "nowrap" },
-                               title: s.detail }, s.detail));
-    };
+  // The launcher's own download bar (`Bar`, as for other products' downloads)
+  function downloadData(s) {
+    var a = s.app, t = a && a.transfer;
+    var base = { id: "macd2", productId: "dungeons2", intent: t && t.update ? "Update" : "Install",
+                 progress: a && typeof a.progress === "number" ? a.progress : 0,
+                 currentBytes: 0, totalBytes: 0 };
+    if (s.pending && (!a || a.stage === "idle"))
+      return Object.assign(base, { state: "Preparing", note: t_("starting") });
+    if (!a) return null;
+    switch (a.stage) {
+      case "working":
+        if (t && t.phase === "download")
+          return Object.assign(base, { state: "Downloading", currentBytes: t.done, totalBytes: t.total });
+        return Object.assign(base, { state: t ? "Finalizing" : "Preparing", note: a.status });
+      case "needsLogin":
+      case "needsConsent":
+        return Object.assign(base, { state: "Pending", note: a.status });
+      case "failed":
+        return Object.assign(base, { state: "Errored", note: a.status });
+      default:
+        return null;
+    }
   }
+  function t_(k) { return t(k); }
+  var Bar = null;
+  window.__macd2Bar = function (R, DownloadBar) {
+    if (!Bar) Bar = function () {
+      var s = useAppState(R, true);
+      var d = s && downloadData(s);
+      if (!d) return null;
+      return R.createElement(DownloadBar, {
+        downloadData: d, interruptible: false, fixed: true,
+        isCancelEnabled: function () { return false; },
+        onPause: function () {}, onResume: function () {}, onCancel: function () {},
+        additionalStateText: function () { return d.note || null; },
+      });
+    };
+    return R.createElement(Bar, { key: "macd2ProgressBar" });
+  };
 })();

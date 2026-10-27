@@ -128,6 +128,9 @@ final class MCLauncherLink {
         }
         var body: [String: Any] = ["stage": stage, "status": launcher.status, "detail": launcher.detail]
         if let p = launcher.progress { body["progress"] = p }
+        if let t = launcher.transfer {
+            body["transfer"] = ["phase": t.phase, "update": t.update, "done": t.done, "total": t.total]
+        }
         return (try? JSONSerialization.data(withJSONObject: body)) ?? Data("{}".utf8)
     }
 

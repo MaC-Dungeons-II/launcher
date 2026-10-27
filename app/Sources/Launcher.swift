@@ -16,6 +16,11 @@ final class Launcher: ObservableObject {
     @Published var status = "준비 중…"
     @Published var detail = ""
     @Published var progress: Double? = nil
+    /// The game download or install under way, for Minecraft Launcher's
+    /// progress bar (MCLauncherLink); nil otherwise.
+    struct Transfer { var phase: String; var update: Bool; var done: Double; var total: Double }
+    private(set) var transfer: Transfer? = nil
+    private var transferIsUpdate = false
     /// wasdmod (keyboard and mouse as a controller) and its key layout; both
     /// apply from the next game launch.
     @Published var wasdEnabled = UserDefaults.standard.bool(forKey: "wasdmod.enabled") {
@@ -164,7 +169,7 @@ final class Launcher: ObservableObject {
     }
 
     private func set(_ s: String, _ d: String = "", _ p: Double? = nil) {
-        status = s; detail = d; progress = p
+        status = s; detail = d; progress = p; transfer = nil
     }
 
     private func fail(_ message: String) {
@@ -364,6 +369,7 @@ final class Launcher: ObservableObject {
         let staging = data.appendingPathComponent("game.new")
         try? fm.removeItem(at: staging)
         set(installed == nil ? "게임 내려받는 중…" : "업데이트 내려받는 중… (\(latest))", "Microsoft에서 \(latest) 버전을 받고 있어요", 0)
+        transferIsUpdate = installed != nil
         var fetchEnv = ProcessInfo.processInfo.environment
         fetchEnv["MACD2_PROGRESS_JSON"] = "1"
         speed = 0
@@ -402,6 +408,7 @@ final class Launcher: ObservableObject {
         case "download":
             if let done = j["done"] as? Double, let total = j["total"] as? Double, total > 0 {
                 progress = min(max(done / total, 0), 1)
+                transfer = Transfer(phase: "download", update: transferIsUpdate, done: done, total: total)
                 let now = Date()
                 if let (t0, d0) = lastSample {
                     let dt = now.timeIntervalSince(t0)
@@ -427,9 +434,11 @@ final class Launcher: ObservableObject {
             status = "게임 설치 중…"
             if let done = j["done"] as? Double, let total = j["total"] as? Double, total > 0 {
                 progress = min(done / total, 1)
+                transfer = Transfer(phase: "install", update: transferIsUpdate, done: done, total: total)
                 detail = String(format: "%.1f / %.1f GB · 계정 라이선스로 패키지를 풀고 있어요", done / 1e9, total / 1e9)
             } else {
                 detail = "계정 라이선스로 패키지를 풀고 있어요"; progress = nil
+                transfer = Transfer(phase: "install", update: transferIsUpdate, done: 0, total: 0)
             }
         case "error":
             fetchErrorStage = j["stage"] as? String
