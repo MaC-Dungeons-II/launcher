@@ -21,11 +21,11 @@ Layers 1 and 3 come from the [Flightdeck fork](https://github.com/MaC-Dungeons-I
 
 | GDK API | Answered by | Notes |
 |---|---|---|
-| XUser, XGame (sign-in, Xbox Live tokens and signatures) | 1 → xodus user runtime (`xodus_store_test.dll`) → `macd2-broker` | The genuine runtime can't sign in under Wine. With `XODUS_USER_RUNTIME=1` the runtime hands these to the xodus user runtime, which signs in and makes the tokens and signatures itself. No session file is written. |
-| XStore (license, entitlements, package updates) | 1 → xodus store module → `macd2-broker` | Ownership comes from the Microsoft-signed license token for the signed-in account. Nothing is hard-coded. |
-| XGameSave | 1, local store | Saves are kept in `C:\gamesave` in the prefix (`XODUS_LOCAL_GAMESAVE=1`) and stay on the Mac; they are not uploaded to the Xbox cloud. Users come from the xodus user runtime, so handles match. |
-| XNetworking (TLS policy per URL, used by libHttpClient's websockets) | 1 | Answered by the runtime itself. |
-| XThreading (XAsync, task queues), everything else | 2. genuine runtime | The runtime forwards unknown classes unchanged. |
+| XUser (the signed-in user, Xbox Live tokens) | 1, from the session file | The genuine runtime can't sign in under Wine. The launcher signs in on the Mac side (`macd2 mac-session`) and writes a session file with the account's identity and its tokens for the title's services. The runtime reads it (`MacUser.cpp`, folder in `XODUS_MAC_SESSION`) and asks for a renewed file when the game forces a refresh. No refresh credential enters Wine. |
+| XStore (license, entitlements, package updates) | 1 → xodus store module (`xodus_store_test.dll`) → `macd2-broker` | Ownership comes from the Microsoft-signed license token for the signed-in account. Nothing is hard-coded. |
+| XGameSave | 1, local store | Saves are kept in `C:\gamesave` in the prefix (`XODUS_LOCAL_GAMESAVE=1`) and stay on the Mac; they are not uploaded to the Xbox cloud. Users come from the session file, so handles match. |
+| XNetworking (connectivity, TLS policy per URL for libHttpClient's websockets) | 1 | Answered by the runtime itself. Wine on macOS reports no default route, so connectivity comes from a probe to an Internet host. |
+| XGame, XThreading (XAsync, task queues), everything else | 2. genuine runtime | The runtime forwards unknown classes unchanged. |
 | XCurl (the title's HTTP) | 3 | See below. |
 
 ## Changes in the Flightdeck fork
@@ -33,8 +33,9 @@ Layers 1 and 3 come from the [Flightdeck fork](https://github.com/MaC-Dungeons-I
 Upstream Flightdeck replaces the whole runtime. Here it sits in front of the genuine runtime, so a few things changed (`macos` branch):
 
 - **Genuine task queues** (`GenuineAsync.h`/`.cpp`). The game's task queues belong to the genuine runtime. Store, GameSave, NetworkSecurity and license-event async work and queue calls go through the genuine `IXThreadingImpl`. The runtime's own XAsync copy would write into the genuine runtime's memory and crash.
-- **Lazy start.** Starting the xodus module during runtime init shut the game down before its window opened. The init arguments are saved and the module starts on first use of Store, GameSave or users (`EnsureStoreModule`).
-- **Users from the xodus user runtime.** XUser and XGame go there, and GameSave takes its users from the same place. Two user objects make the game fail with 0041.
+- **Lazy start.** Starting the xodus module during runtime init shut the game down before its window opened. The init arguments are saved and the module starts on first use of Store or GameSave (`EnsureStoreModule`).
+- **Users from the session file** (`MacUser.cpp`). One user, the account signed in by the launcher, with the game's 50-slot XUser interface; GameSave and handle checks use the same user. Two user objects make the game fail with 0041. With xodus's Wine user runtime instead, the game quit before loading its saves. The interface layout follows mcd2-crossover's user provider (MIT, Copyright (c) 2026 Wanzho).
+- **Connectivity.** Wine on macOS has no default route, so the runtime would report offline. It probes an Internet host instead and reports the result.
 - **Title config.** Under Wine the genuine runtime doesn't find the title's `MicrosoftGame.config`. Callers that pass no initialization options get one pointing at it; all three Initialize entry points go through `InitializeApiImplEx2`. This follows mcd2-crossover's adapter.
 - **Websockets.** `wss://` is checked like `https://`. Port 0 means 443. Hosts outside the title's policy get TLS 1.2 with no pins (certificates are still verified).
 - **Package updates** report "no updates". The launcher installs and updates the game itself.
@@ -52,8 +53,9 @@ Its behaviour follows mcd2-crossover's XCurl wrapper (MIT, Copyright (c) 2026 Wa
 
 ## Helper processes
 
-- **`macd2-broker`** (xodus service) listens on `/tmp/macd2.sock`. It answers the xodus user runtime (sign-in, tokens) and Store license and entitlement queries using the account's Microsoft-signed license token.
-- **`macd2 mac-session --check`** is how the launcher checks sign-in before showing Install or Play. It signs in to the Xbox services and reports only the outcome (exit 0, 77 sign in again, 69 offline). It writes nothing.
+- **`macd2-broker`** (xodus service) listens on `/tmp/macd2.sock`. It answers Store license and entitlement queries using the account's Microsoft-signed license token.
+- **`macd2 mac-session <folder>`** is how the launcher checks sign-in before showing Install or Play. It signs in to the Xbox services, writes the session file (in the data folder, readable only by you) and reports the outcome (exit 0, 77 sign in again, 69 offline).
+- **`macd2 mac-session <folder> --serve`** runs while the game does. It keeps the session file's tokens fresh and answers the runtime's refresh requests.
 - **`macd2 mac-fetch`** downloads and extracts the game package.
 - **`macd2 run`** decrypts the game's encrypted executables into a RAM disk and starts Wine. The game's anti-tamper re-reads its own executable, so that copy has to be the real file.
 
@@ -73,5 +75,7 @@ Off unless the user turns it on in the app (`MCLauncherPatch.swift`, `app/Resour
 | `MACD2_WINEDEBUG` | Overrides `WINEDEBUG` (default `err+all,fixme-all`) |
 | `MACD2_MSYNC=0` | Turns off Mach-semaphore sync |
 | `XODUS_TRACE_QUERYAPI=1` | Logs every QueryApi call the runtime forwards to the genuine runtime (very noisy) |
+| `XODUS_NETWORKING=genuine` | Leaves XNetworking to the genuine runtime |
+| `MACD2_LAYER_DIR=<folder>` | Copies every file in that folder over the game folder after the normal layer (for testing DLLs) |
 
 These can go in `debug.env` in the data folder (one `KEY=VALUE` per line). Logs are in `~/Library/Application Support/M(a)C Dungeons II/logs`.

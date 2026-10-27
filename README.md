@@ -49,11 +49,11 @@ Install (and Play, when an update is out) downloads the game from Microsoft's CD
 
 ## Play from the Minecraft Launcher (optional)
 
-Off by default. Turn on the switch **Minecraft Launcher에서도 플레이** ("Also play from the Minecraft Launcher") in the app's window. It appears only when the Mac Minecraft Launcher is installed. The app says what it changes and asks before doing anything.
+Off by default. Turn on the switch **Minecraft Launcher에서도 플레이** ("Also play from the Minecraft Launcher"). It is on the app's ready-to-play screen, or under **File → Minecraft Launcher 연결…** at any time (also before signing in). It appears only when the Mac Minecraft Launcher is installed. The app says what it changes and asks before doing anything.
 
 When it's on:
 
-- The Minecraft Launcher's Dungeons II page gets a Play button. Pressing it opens this app hidden; the launcher's own download bar shows our progress (with pause, resume and cancel). The app's window comes up only when you need to act (sign-in, the GDK license, an error).
+- The Minecraft Launcher's Dungeons II page gets a Play button (or Install, if the game isn't installed yet), and its title is marked "(UNOFFICIAL MAC PORT)". Pressing it opens this app hidden; the launcher's own download bar shows our progress (with pause, resume and cancel). The app's window comes up only when you need to act (sign-in, the GDK license, an error).
 - To do that, the app patches the Minecraft Launcher's UI file (`ui.zip`), Dungeons II page only. The original is kept as `~/Library/Application Support/minecraft/macd2-ui.zip.orig`.
 - It installs a per-user LaunchAgent, `io.github.mac-dungeons-ii.link`. launchd listens on `127.0.0.1:47821` and answers only requests from the launcher's page.
 - When the Minecraft Launcher updates, it puts its own `ui.zip` back. While the switch is on, the app re-applies the patch the next time it opens.
@@ -72,11 +72,11 @@ Dungeons-WinGDK-Shipping.exe
  ├─ xgameruntime.dll            Flightdeck-based runtime (our fork)
  │   └─ xgameruntime_original.dll  Microsoft's genuine GDK runtime (downloaded)
  └─ XCurl.dll                   curl wrapper over curl.se's libcurl (same fork)
-xodus_store_test.dll ── /tmp/macd2.sock ── macd2-broker   sign-in, Xbox tokens, Store licenses (xodus)
-macd2          sign-in check, download/extract, launch (xodus)
+xodus_store_test.dll ── /tmp/macd2.sock ── macd2-broker   Store licenses (xodus)
+macd2          sign-in and session file, download/extract, launch (xodus)
 ```
 
-- Users (XUser) go to the xodus user runtime, which signs in and makes Xbox Live tokens and signatures itself. Store licenses come from your Microsoft-signed license through `macd2-broker`. Task queues stay with the genuine runtime.
+- Sign-in happens on the Mac side: `macd2 mac-session` signs in and writes a session file with your Xbox Live tokens for the game's services, and the runtime hands that user to the game (XUser). No refresh credential goes into Wine. Store licenses come from your Microsoft-signed license through `macd2-broker`. Task queues stay with the genuine runtime.
 - Wine — built from CodeWeavers' CrossOver 26.3 sources
 - DXMT — Direct3D 11 → Metal
 - GStreamer — game videos (H.264)
@@ -155,7 +155,7 @@ Changes in the forks are on their `macos` branches.
 
 - [xodus](https://github.com/xodus-gaming/xodus) — Microsoft sign-in, licenses, package downloads
 - [Flightdeck](https://github.com/marselnenaj/flightdeck-msfs-2024-linux-xbox) — GDK runtime proxy, Store broker
-- [mcd2-crossover](https://github.com/Wanzho/mcd2-crossover) by Wanzho — the early adapter that first made the genuine runtime usable; our XCurl fixes, the Wine wait-queue fix and the title-config default follow its work
+- [mcd2-crossover](https://github.com/Wanzho/mcd2-crossover) by Wanzho — the early adapter that first made the genuine runtime usable; our XCurl fixes, the Wine wait-queue fix, the title-config default and the XUser interface layout follow its work
 - [WineGDK](https://github.com/Sightem/WineGDK), [GDK-Proton](https://github.com/LukasPAH/GDK-Proton-Custom) — GDK builtins
 - [DXMT](https://github.com/3Shain/dxmt) — Direct3D 11 → Metal
 - CodeWeavers, the Wine project

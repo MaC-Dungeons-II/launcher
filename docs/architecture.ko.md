@@ -21,11 +21,11 @@ Dungeons-WinGDK-Shipping.exe
 
 | GDK API | 처리하는 곳 | 설명 |
 |---|---|---|
-| XUser, XGame (로그인, Xbox Live 토큰과 서명) | 1 → xodus 사용자 런타임(`xodus_store_test.dll`) → `macd2-broker` | 정품 런타임은 Wine에서 로그인하지 못합니다. `XODUS_USER_RUNTIME=1`이면 런타임이 이 호출을 xodus 사용자 런타임에 넘기고, 사용자 런타임이 직접 로그인해서 토큰과 서명을 만듭니다. 세션 파일은 쓰지 않습니다. |
-| XStore (라이선스, 보유 목록, 패키지 업데이트) | 1 → xodus store 모듈 → `macd2-broker` | 소유권은 로그인한 계정의 Microsoft 서명 라이선스 토큰으로 확인합니다. 고정 응답은 없습니다. |
-| XGameSave | 1, 로컬 저장소 | 프리픽스의 `C:\gamesave`에 저장합니다(`XODUS_LOCAL_GAMESAVE=1`). 저장은 Mac에만 남고 Xbox 클라우드로 올리지 않습니다. 사용자 핸들이 맞도록 xodus 사용자 런타임의 사용자를 씁니다. |
-| XNetworking (URL별 TLS 정책, libHttpClient 웹소켓이 사용) | 1 | 런타임이 직접 응답합니다. |
-| XThreading (XAsync, 작업 큐), 그 밖의 전부 | 2. 정품 런타임 | 런타임이 모르는 클래스는 그대로 넘깁니다. |
+| XUser (로그인한 사용자, Xbox Live 토큰) | 1, 세션 파일에서 | 정품 런타임은 Wine에서 로그인하지 못합니다. 런처가 Mac 쪽에서 로그인하고(`macd2 mac-session`), 계정 정보와 게임 서비스용 토큰을 세션 파일에 씁니다. 런타임은 그 파일을 읽고(`MacUser.cpp`, 폴더는 `XODUS_MAC_SESSION`), 게임이 갱신을 요구하면 새 파일을 요청합니다. 갱신용 자격 증명은 Wine 안으로 들어가지 않습니다. |
+| XStore (라이선스, 보유 목록, 패키지 업데이트) | 1 → xodus store 모듈(`xodus_store_test.dll`) → `macd2-broker` | 소유권은 로그인한 계정의 Microsoft 서명 라이선스 토큰으로 확인합니다. 고정 응답은 없습니다. |
+| XGameSave | 1, 로컬 저장소 | 프리픽스의 `C:\gamesave`에 저장합니다(`XODUS_LOCAL_GAMESAVE=1`). 저장은 Mac에만 남고 Xbox 클라우드로 올리지 않습니다. 사용자 핸들이 맞도록 세션 파일의 사용자를 씁니다. |
+| XNetworking (연결 상태, libHttpClient 웹소켓의 URL별 TLS 정책) | 1 | 런타임이 직접 응답합니다. macOS의 Wine은 기본 경로가 없다고 알려서, 연결 상태는 인터넷 호스트에 접속해 보고 판단합니다. |
+| XGame, XThreading (XAsync, 작업 큐), 그 밖의 전부 | 2. 정품 런타임 | 런타임이 모르는 클래스는 그대로 넘깁니다. |
 | XCurl (게임의 HTTP) | 3 | 아래 참고. |
 
 ## Flightdeck 포크의 변경
@@ -33,8 +33,9 @@ Dungeons-WinGDK-Shipping.exe
 원래 Flightdeck은 런타임 전체를 대신합니다. 여기서는 정품 런타임 앞에 놓이기 때문에 몇 가지를 바꿨습니다(`macos` 브랜치).
 
 - **정품 작업 큐 사용** (`GenuineAsync.h`/`.cpp`): 게임의 작업 큐는 정품 런타임 소유입니다. Store, GameSave, NetworkSecurity, 라이선스 이벤트의 비동기 작업과 큐 호출은 정품 `IXThreadingImpl`로 처리합니다. 런타임 자체의 XAsync를 쓰면 정품 런타임 메모리에 써서 크래시가 납니다.
-- **지연 시작:** 런타임 초기화 때 xodus 모듈을 띄우면 게임 창이 뜨기 전에 게임이 종료됐습니다. 그래서 초기화 인자만 저장해 두고, Store, GameSave, 사용자 기능을 처음 쓸 때 시작합니다(`EnsureStoreModule`).
-- **사용자는 xodus 사용자 런타임에서:** XUser와 XGame을 그쪽으로 보내고, GameSave도 같은 곳의 사용자를 씁니다. 사용자 객체가 두 개가 되면 게임이 0041 오류로 실패합니다.
+- **지연 시작:** 런타임 초기화 때 xodus 모듈을 띄우면 게임 창이 뜨기 전에 게임이 종료됐습니다. 그래서 초기화 인자만 저장해 두고, Store나 GameSave를 처음 쓸 때 시작합니다(`EnsureStoreModule`).
+- **사용자는 세션 파일에서** (`MacUser.cpp`): 런처가 로그인한 계정 하나를 게임의 XUser 인터페이스(슬롯 50개)로 제공합니다. GameSave와 핸들 확인도 같은 사용자를 씁니다. 사용자 객체가 두 개가 되면 게임이 0041 오류로 실패합니다. xodus의 Wine 사용자 런타임을 쓰면 게임이 저장을 불러오기 전에 종료됐습니다. 인터페이스 구조는 mcd2-crossover의 사용자 제공자를 따릅니다(MIT, Copyright (c) 2026 Wanzho).
+- **연결 상태:** macOS의 Wine에는 기본 경로가 없어서 런타임이 오프라인으로 판단합니다. 대신 인터넷 호스트에 접속해 보고 그 결과를 알립니다.
 - **타이틀 설정:** Wine에서는 정품 런타임이 게임의 `MicrosoftGame.config`를 찾지 못합니다. 초기화 옵션 없이 부르면 이 파일을 가리키는 옵션을 넣어 주고, Initialize 진입점 세 개를 모두 `InitializeApiImplEx2`로 모읍니다. mcd2-crossover 어댑터의 방식을 따랐습니다.
 - **웹소켓:** `wss://`는 `https://`와 같은 정책으로 확인합니다. 포트 0은 443입니다. 게임 정책에 없는 호스트에는 TLS 1.2, 핀 없음을 적용합니다(인증서는 그대로 검증합니다).
 - **패키지 업데이트:** "업데이트 없음"으로 응답합니다. 게임 설치와 업데이트는 런처가 직접 합니다.
@@ -52,8 +53,9 @@ Dungeons-WinGDK-Shipping.exe
 
 ## 보조 프로세스
 
-- **`macd2-broker`**(xodus 서비스): `/tmp/macd2.sock`에서 대기합니다. xodus 사용자 런타임(로그인, 토큰)과 Store 라이선스·보유 목록 질의에 계정의 Microsoft 서명 라이선스 토큰으로 응답합니다.
-- **`macd2 mac-session --check`**: 런처가 설치·플레이 버튼을 보여 주기 전에 로그인을 확인할 때 씁니다. Xbox 서비스에 로그인해 보고 결과만 알립니다(종료 코드 0, 77 다시 로그인, 69 오프라인). 아무것도 쓰지 않습니다.
+- **`macd2-broker`**(xodus 서비스): `/tmp/macd2.sock`에서 대기합니다. Store 라이선스·보유 목록 질의에 계정의 Microsoft 서명 라이선스 토큰으로 응답합니다.
+- **`macd2 mac-session <폴더>`**: 런처가 설치·플레이 버튼을 보여 주기 전에 로그인을 확인할 때 씁니다. Xbox 서비스에 로그인하고, 세션 파일을 쓰고(데이터 폴더 안, 본인만 읽을 수 있음), 결과를 알립니다(종료 코드 0, 77 다시 로그인, 69 오프라인).
+- **`macd2 mac-session <폴더> --serve`**: 게임이 도는 동안 함께 돕니다. 세션 파일의 토큰을 새로 유지하고 런타임의 갱신 요청에 응답합니다.
 - **`macd2 mac-fetch`**: 게임 패키지를 내려받아 풉니다.
 - **`macd2 run`**: 암호화된 게임 실행 파일을 RAM 디스크에 풀고 Wine을 실행합니다. 게임의 변조 방지 코드가 자기 실행 파일을 다시 읽기 때문에, 이 사본이 실제 파일이어야 합니다.
 
@@ -73,5 +75,7 @@ Dungeons-WinGDK-Shipping.exe
 | `MACD2_WINEDEBUG` | `WINEDEBUG`를 바꿉니다(기본 `err+all,fixme-all`). |
 | `MACD2_MSYNC=0` | Mach 세마포어 동기화를 끕니다. |
 | `XODUS_TRACE_QUERYAPI=1` | 런타임이 정품 런타임으로 넘기는 QueryApi 호출을 전부 기록합니다(양이 매우 많음). |
+| `XODUS_NETWORKING=genuine` | XNetworking을 정품 런타임에 맡깁니다. |
+| `MACD2_LAYER_DIR=<폴더>` | 일반 레이어를 복사한 뒤 그 폴더의 파일을 전부 게임 폴더에 덮어씁니다(DLL 시험용). |
 
 데이터 폴더의 `debug.env`에 한 줄에 하나씩 `KEY=VALUE`로 적어도 됩니다. 로그는 `~/Library/Application Support/M(a)C Dungeons II/logs`에 있습니다.

@@ -16,9 +16,9 @@ with your account's license.
 | SDL 2.32.10 (libsdl-org/SDL) | zlib | game controller input (winebus SDL backend) |
 | GDK builtins from GDK-Proton 11-7 (LukasPAH/GDK-Proton-Custom, WineGDK-based): xgameruntime, wintypes, twinapi.appcore, windows.* | LGPL-2.1-or-later | PE builtins, unmodified |
 | WineGDK (Sightem/WineGDK b5d23b0) + Flightdeck runtime patch: gameinput, xodus_store_test | LGPL-2.1-or-later | built by mac/build-store-bridge.sh |
-| Flightdeck runtime (marselnenaj/flightdeck-msfs-2024-linux-xbox), shipped as `xgameruntime.dll` | LGPL-2.1-or-later | modified for this launcher (MaC-Dungeons-II fork, `macos` branch); its title-config default follows mcd2-crossover (MIT, see below) |
+| Flightdeck runtime (marselnenaj/flightdeck-msfs-2024-linux-xbox), shipped as `xgameruntime.dll` | LGPL-2.1-or-later | modified for this launcher (MaC-Dungeons-II fork, `macos` branch); its title-config default and XUser interface layout (`MacUser.cpp`) follow mcd2-crossover (MIT, see below) |
 | XCurl wrapper (`XCurl.dll`, `compat/xcurl` in the same fork) | MIT | behaviour follows the XCurl wrapper and Wine wait-queue fix of mcd2-crossover (Wanzho/mcd2-crossover), MIT, Copyright (c) 2026 Wanzho |
-| xodus (xodus-gaming/xodus), shipped as `macd2` / `macd2-broker` | GPL-3.0 | modified: mac-fetch, mac-session (`--check`), keychain/socket names |
+| xodus (xodus-gaming/xodus), shipped as `macd2` / `macd2-broker` | GPL-3.0 | modified: mac-fetch, mac-session (session file, `--serve`), keychain/socket names |
 
 ## Downloaded on first run (not bundled)
 
@@ -37,7 +37,7 @@ FFmpeg (LGPL-2.1). GStreamer's license files are in
 to curl when the app downloads it.
 
 mcd2-crossover's MIT license, which applies to the XCurl wrapper and the
-title-config default above:
+title-config default and XUser interface layout above:
 
     Copyright (c) 2026 Wanzho
 

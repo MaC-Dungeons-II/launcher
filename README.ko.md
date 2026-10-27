@@ -49,11 +49,11 @@ M4 MacBook(macOS 27)에서 확인했습니다.
 
 ## Minecraft Launcher에서 플레이 (선택)
 
-기본은 꺼져 있습니다. 앱 창의 **Minecraft Launcher에서도 플레이** 스위치로 켭니다. 이 스위치는 Mac용 Minecraft Launcher가 설치되어 있을 때만 보입니다. 켜기 전에 무엇을 바꾸는지 알려 주고 확인을 받습니다.
+기본은 꺼져 있습니다. **Minecraft Launcher에서도 플레이** 스위치로 켭니다. 스위치는 앱의 플레이 준비 화면에 있고, **파일 → Minecraft Launcher 연결…** 메뉴로는 언제든(로그인 전에도) 열 수 있습니다. 이 스위치는 Mac용 Minecraft Launcher가 설치되어 있을 때만 보입니다. 켜기 전에 무엇을 바꾸는지 알려 주고 확인을 받습니다.
 
 켜면 다음과 같이 동작합니다.
 
-- Minecraft Launcher의 Dungeons II 화면에 플레이 버튼이 생깁니다. 누르면 이 앱이 숨은 채로 열리고, 진행 상황은 Minecraft Launcher의 다운로드 막대에 나옵니다(일시 정지, 이어 받기, 취소 가능). 로그인, GDK 라이선스, 오류처럼 직접 해야 할 일이 있을 때만 앱 창이 나타납니다.
+- Minecraft Launcher의 Dungeons II 화면에 플레이 버튼(게임이 없으면 설치 버튼)이 생기고, 제목에 "(UNOFFICIAL MAC PORT)"가 붙습니다. 누르면 이 앱이 숨은 채로 열리고, 진행 상황은 Minecraft Launcher의 다운로드 막대에 나옵니다(일시 정지, 이어 받기, 취소 가능). 로그인, GDK 라이선스, 오류처럼 직접 해야 할 일이 있을 때만 앱 창이 나타납니다.
 - 이를 위해 Minecraft Launcher의 화면 파일(`ui.zip`)에서 Dungeons II 부분만 고칩니다. 원본은 `~/Library/Application Support/minecraft/macd2-ui.zip.orig`로 보관합니다.
 - 사용자별 LaunchAgent `io.github.mac-dungeons-ii.link`를 설치합니다. launchd가 `127.0.0.1:47821`에서 대기하며, Minecraft Launcher 화면에서 온 요청에만 응답합니다.
 - Minecraft Launcher가 업데이트되면 원래 `ui.zip`으로 돌아갑니다. 스위치가 켜져 있으면 다음에 앱을 열 때 다시 적용합니다.
@@ -72,11 +72,11 @@ Dungeons-WinGDK-Shipping.exe
  ├─ xgameruntime.dll            Flightdeck 기반 런타임 (포크)
  │   └─ xgameruntime_original.dll  Microsoft 정품 GDK 런타임 (내려받음)
  └─ XCurl.dll                   curl.se libcurl을 감싼 curl 래퍼 (같은 포크)
-xodus_store_test.dll ── /tmp/macd2.sock ── macd2-broker   로그인, Xbox 토큰, Store 라이선스 (xodus)
-macd2          로그인 확인, 다운로드·풀기, 실행 (xodus)
+xodus_store_test.dll ── /tmp/macd2.sock ── macd2-broker   Store 라이선스 (xodus)
+macd2          로그인과 세션 파일, 다운로드·풀기, 실행 (xodus)
 ```
 
-- 사용자(XUser)는 xodus 사용자 런타임이 처리하며, 직접 로그인해서 Xbox Live 토큰과 서명을 만듭니다. Store 라이선스는 `macd2-broker`를 거쳐 Microsoft 서명 라이선스로 확인합니다. 작업 큐는 정품 런타임이 그대로 맡습니다.
+- 로그인은 Mac 쪽에서 합니다. `macd2 mac-session`이 로그인해서 게임 서비스용 Xbox Live 토큰을 세션 파일에 쓰고, 런타임이 그 사용자를 게임에 넘깁니다(XUser). 갱신용 자격 증명은 Wine 안으로 들어가지 않습니다. Store 라이선스는 `macd2-broker`를 거쳐 Microsoft 서명 라이선스로 확인합니다. 작업 큐는 정품 런타임이 그대로 맡습니다.
 - Wine — CodeWeavers CrossOver 26.3 소스로 직접 빌드
 - DXMT — Direct3D 11 → Metal
 - GStreamer — 게임 영상(H.264) 재생
@@ -155,7 +155,7 @@ uv run --no-project --with pillow python app/icon/make_icon.py
 
 - [xodus](https://github.com/xodus-gaming/xodus) — Microsoft 로그인, 라이선스, 패키지 다운로드
 - [Flightdeck](https://github.com/marselnenaj/flightdeck-msfs-2024-linux-xbox) — GDK 런타임 프록시, Store 브로커
-- [mcd2-crossover](https://github.com/Wanzho/mcd2-crossover)(Wanzho) — 정품 런타임을 처음 쓸 수 있게 해 준 초기 어댑터. XCurl 수정, Wine 대기 큐 수정, 타이틀 설정 기본값은 이 작업을 따랐습니다.
+- [mcd2-crossover](https://github.com/Wanzho/mcd2-crossover)(Wanzho) — 정품 런타임을 처음 쓸 수 있게 해 준 초기 어댑터. XCurl 수정, Wine 대기 큐 수정, 타이틀 설정 기본값, XUser 인터페이스 구조는 이 작업을 따랐습니다.
 - [WineGDK](https://github.com/Sightem/WineGDK), [GDK-Proton](https://github.com/LukasPAH/GDK-Proton-Custom) — GDK 빌트인
 - [DXMT](https://github.com/3Shain/dxmt) — Direct3D 11 → Metal
 - CodeWeavers, Wine 프로젝트
