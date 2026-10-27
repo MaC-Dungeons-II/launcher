@@ -14,12 +14,18 @@
       head: "Mac에서 플레이하기",
       body: "플레이를 누르면 비공식 포팅 런처 M(a)C Dungeons II가 게임을 실행해요. Mojang·Microsoft와 관계없는 프로젝트라, 문제는 저장소에 알려 주세요.",
       repo: "저장소 바로가기", starting: "M(a)C Dungeons II 시작 중",
+      login: "새로 뜬 M(a)C Dungeons II 창에서 Microsoft 계정으로 로그인해 주세요",
+      consent: "새로 뜬 M(a)C Dungeons II 창에서 라이선스에 동의해 주세요",
+      failed: "M(a)C Dungeons II 창을 확인해 주세요",
     },
     en: {
       banner: "Minecraft Dungeons II runs on this Mac through M(a)C Dungeons II, an unofficial port.",
       head: "Playing on Mac",
       body: "Play starts the game through M(a)C Dungeons II, an unofficial port not affiliated with Mojang or Microsoft. Please report problems on our repository.",
       repo: "Open our repo", starting: "Starting M(a)C Dungeons II",
+      login: "Sign in with your Microsoft account in the M(a)C Dungeons II window that opened",
+      consent: "Accept the license in the M(a)C Dungeons II window that opened",
+      failed: "See the M(a)C Dungeons II window",
     },
   };
   function t(k) { return (korean() ? TEXT.ko : TEXT.en)[k]; }
@@ -107,11 +113,13 @@
         return Object.assign(base, { state: t ? "Finalizing" : "Preparing", note: a.status });
       case "paused":
         return Object.assign(base, { state: "Paused", currentBytes: t ? t.done : 0, totalBytes: t ? t.total : 0 });
+      // the app's window has opened for these: point there
       case "needsLogin":
+        return Object.assign(base, { state: "Pending", note: t_("login") });
       case "needsConsent":
-        return Object.assign(base, { state: "Pending", note: a.status });
+        return Object.assign(base, { state: "Pending", note: t_("consent") });
       case "failed":
-        return Object.assign(base, { state: "Errored", note: a.status });
+        return Object.assign(base, { state: "Errored", note: a.status + " · " + t_("failed") });
       default:
         return null;
     }
