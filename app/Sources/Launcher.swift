@@ -851,12 +851,13 @@ final class Launcher: ObservableObject {
 
     /// The game opens, and goes fullscreen, on Windows' primary monitor, which
     /// Wine maps to the macOS menu-bar display. To use the display the launcher
-    /// window is on instead, hand its CGDirectDisplayID to winemac
+    /// window (or Minecraft Launcher's) is on instead, hand its CGDirectDisplayID to winemac
     /// (MACD2_PRIMARY_DISPLAY, mac/patches/winemac-primary-display.patch),
     /// which then reports that display as primary. nil when it already is.
     private func launcherDisplayID() -> CGDirectDisplayID? {
         guard let primary = NSScreen.screens.first,
-              let screen = NSApp.windows.first(where: { $0.isVisible })?.screen,
+              // started from Minecraft Launcher (no window): the display it is on
+              let screen = NSApp.windows.first(where: { $0.isVisible })?.screen ?? MCLauncherLink.minecraftLauncherScreen(),
               screen != primary,
               let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
         else { return nil }

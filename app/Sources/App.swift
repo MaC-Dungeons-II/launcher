@@ -39,8 +39,29 @@ struct MaCDungeonsApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    weak var launcher: Launcher?
+    weak var launcher: Launcher? {
+        didSet {
+            MainActor.assumeIsolated {
+                guard let launcher, link == nil else { return }
+                link = MCLauncherLink(launcher: launcher)
+                link?.start()
+                if openedByLink { link?.openedFromMinecraftLauncher() }
+            }
+        }
+    }
+    private var link: MCLauncherLink?
+    private var openedByLink = false
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// macd2://play: Minecraft Launcher's Play button (see mac/mclauncher-link.py
+    /// and MCLauncherLink). Opening the app already starts the game.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        MainActor.assumeIsolated {
+            guard urls.contains(where: { $0.scheme == "macd2" }) else { return }
+            guard let launcher, let link else { openedByLink = true; return }   // still launching
+            if launcher.stage == .failed { launcher.start() }
+            link.openedFromMinecraftLauncher()
+        }
+    }
     /// While playing, the game is asked to close first; the launcher replies
     /// once it has (Wine is stopped after 20 s if it hasn't).
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

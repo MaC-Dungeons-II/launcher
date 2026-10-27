@@ -14,6 +14,13 @@
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.games</string>
     <key>NSHighResolutionCapable</key><true/>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key><string>io.github.mac-dungeons-ii.launcher.play</string>
+            <key>CFBundleURLSchemes</key><array><string>macd2</string></array>
+        </dict>
+    </array>
     <key>NSHumanReadableCopyright</key><string>Unofficial launcher. Not affiliated with Mojang, Microsoft or Xbox.</string>
 </dict>
 </plist>
