@@ -21,7 +21,7 @@ M4 MacBook(macOS 27)에서 확인했습니다.
 - 설정·저장
 - 인트로와 게임 안 영상
 - 블루투스 Xbox 컨트롤러
-- 게임 메뉴에서 종료 (런처가 Wine까지 정리하고 같이 닫힘)
+- 게임 메뉴에서 종료 (런처가 Wine까지 정리함)
 
 기기 한 대에서만 시험했습니다. 게임 업데이트로 동작이 깨질 수 있습니다.
 
@@ -36,30 +36,47 @@ M4 MacBook(macOS 27)에서 확인했습니다.
 
 1. [Releases](../../releases)에서 `MaC-Dungeons-II.dmg`를 받아 열고, 앱을 Applications로 끌어다 놓습니다.
 2. 앱을 엽니다. 공증(notarization)을 받지 않은 앱이라 처음에는 macOS가 막습니다. **시스템 설정 → 개인정보 보호 및 보안**에서 **그래도 열기**를 누릅니다.
-3. 로그인하고 기다립니다. 첫 실행 때 게임을 받고, 그다음부터는 업데이트만 확인합니다.
 
-앱이 하는 일:
+## 사용
 
-1. Microsoft 로그인 (리프레시 토큰은 키체인 "M(a)C Dungeons II" 항목에 저장)
-2. Microsoft GDK 런타임 라이선스 동의 → nuget.org에서 받고 SHA-256 확인
-3. 게임 버전 확인 → 필요하면 Microsoft CDN에서 받아서 풀기 (병렬 다운로드, 이어받기, 속도·남은 시간 표시)
-4. 게임 실행
+창은 Minecraft Launcher를 본떠 꾸몄습니다. 앱을 열면 다음 순서로 진행합니다.
 
-데이터는 전부 `~/Library/Application Support/M(a)C Dungeons II`에 있습니다. 지우려면 앱, 이 폴더, 키체인 항목을 삭제하면 됩니다.
+1. Microsoft 계정을 확인합니다. Minecraft Launcher와 별개로 이 앱에서 따로 로그인합니다. 리프레시 토큰은 macOS 키체인("M(a)C Dungeons II" 항목)에 저장합니다.
+2. Microsoft GDK 런타임 라이선스 동의를 한 번 받습니다. 그다음 런타임을 nuget.org에서 받고 SHA-256을 확인합니다.
+3. 게임이 없으면 **설치**, 있으면 **플레이** 버튼을 보여 줍니다.
+
+설치(업데이트가 있을 때는 플레이)를 누르면 Microsoft CDN에서 게임을 받아 풉니다. 다운로드 막대에 받은 용량, 속도, 남은 시간이 나오고, 일시 정지와 이어 받기를 할 수 있습니다. 병렬로 받고, 중단된 곳부터 이어 받습니다. 끝나면 게임이 실행됩니다.
+
+## Minecraft Launcher에서 플레이 (선택)
+
+기본은 꺼져 있습니다. 앱 창의 **Minecraft Launcher에서도 플레이** 스위치로 켭니다. 이 스위치는 Mac용 Minecraft Launcher가 설치되어 있을 때만 보입니다. 켜기 전에 무엇을 바꾸는지 알려 주고 확인을 받습니다.
+
+켜면 다음과 같이 동작합니다.
+
+- Minecraft Launcher의 Dungeons II 화면에 플레이 버튼이 생깁니다. 누르면 이 앱이 숨은 채로 열리고, 진행 상황은 Minecraft Launcher의 다운로드 막대에 나옵니다(일시 정지, 이어 받기, 취소 가능). 로그인, GDK 라이선스, 오류처럼 직접 해야 할 일이 있을 때만 앱 창이 나타납니다.
+- 이를 위해 Minecraft Launcher의 화면 파일(`ui.zip`)에서 Dungeons II 부분만 고칩니다. 원본은 `~/Library/Application Support/minecraft/macd2-ui.zip.orig`로 보관합니다.
+- 사용자별 LaunchAgent `io.github.mac-dungeons-ii.link`를 설치합니다. launchd가 `127.0.0.1:47821`에서 대기하며, Minecraft Launcher 화면에서 온 요청에만 응답합니다.
+- Minecraft Launcher가 업데이트되면 원래 `ui.zip`으로 돌아갑니다. 스위치가 켜져 있으면 다음에 앱을 열 때 다시 적용합니다.
+- macOS가 이 앱이 다른 앱을 수정하도록 허용할지(**앱 관리**) 묻습니다. 허용하지 않으면 패치를 쓸 수 없습니다.
+
+되돌리려면 스위치를 끄면 됩니다. LaunchAgent를 지우고 원래 `ui.zip`을 복원합니다.
+
+Mojang 런처를 비공식적으로 고치는 기능이며 Mojang·Microsoft가 지원하지 않습니다. 소유권 확인은 그대로라서 게임을 구매한 계정이 있어야 합니다.
 
 ## 구조
 
-게임은 Xbox GDK 런타임을 기대합니다. Mac에서는 Wine 위에 레이어를 몇 겹 얹어서 맞춥니다.
+게임은 Xbox GDK 런타임을 기대합니다. Mac에서는 Wine 위에 런타임 DLL 하나를 얹어서 맞춥니다.
 
 ```
 Dungeons-WinGDK-Shipping.exe
- └─ xgameruntime.dll            mcd2-crossover 어댑터 — Xbox 세션, curl 래퍼
-     └─ xgameruntime-native.dll Flightdeck 프록시 — Store, 저장, 웹소켓
-         └─ xgameruntime_original.dll  Microsoft 정품 GDK 런타임 (첫 실행 때 받음)
-macd2-broker   Microsoft 서명 라이선스로 Store 라이선스 질의에 응답 (xodus)
-macd2          로그인, 세션 갱신, 다운로드·풀기, 실행 (xodus)
+ ├─ xgameruntime.dll            Flightdeck 기반 런타임 (포크)
+ │   └─ xgameruntime_original.dll  Microsoft 정품 GDK 런타임 (내려받음)
+ └─ XCurl.dll                   curl.se libcurl을 감싼 curl 래퍼 (같은 포크)
+xodus_store_test.dll ── /tmp/macd2.sock ── macd2-broker   로그인, Xbox 토큰, Store 라이선스 (xodus)
+macd2          로그인 확인, 다운로드·풀기, 실행 (xodus)
 ```
 
+- 사용자(XUser)는 xodus 사용자 런타임이 처리하며, 직접 로그인해서 Xbox Live 토큰과 서명을 만듭니다. Store 라이선스는 `macd2-broker`를 거쳐 Microsoft 서명 라이선스로 확인합니다. 작업 큐는 정품 런타임이 그대로 맡습니다.
 - Wine — CodeWeavers CrossOver 26.3 소스로 직접 빌드
 - DXMT — Direct3D 11 → Metal
 - GStreamer — 게임 영상(H.264) 재생
@@ -71,7 +88,20 @@ macd2          로그인, 세션 갱신, 다운로드·풀기, 실행 (xodus)
 
 - 게임 실행 파일은 디스크에 암호화된 상태로 둡니다. 실행할 때 RAM 디스크에만 풀어서 씁니다.
 - 저장은 Wine 프리픽스 안의 로컬 저장소에 남습니다. 영웅은 게임 서버에 있어서 Windows와 똑같이 불러옵니다.
-- 이 저장소와 릴리스에는 Microsoft·Mojang 파일이 없습니다. 게임, GDK 런타임, curl은 첫 실행 때 내려받습니다.
+- 이 저장소와 릴리스에는 Microsoft·Mojang 파일이 없습니다. 게임, GDK 런타임, curl은 앱이 내려받습니다.
+
+## 데이터와 삭제
+
+앱이 저장하는 것은 전부 `~/Library/Application Support/M(a)C Dungeons II`에 있습니다(게임, 저장이 들어 있는 Wine 프리픽스, 로그).
+
+전부 지우려면:
+
+1. Minecraft Launcher 연결을 켰다면 먼저 앱에서 끕니다. Minecraft Launcher가 원래대로 돌아가고 LaunchAgent도 지워집니다. 그다음 `~/Library/Application Support/minecraft/macd2-ui.zip.orig`를 지워도 됩니다.
+2. 앱을 삭제합니다.
+3. 위 데이터 폴더를 삭제합니다. 로컬 저장도 같이 지워집니다.
+4. 키체인 접근에서 이름이 "M(a)C Dungeons II"인 항목을 삭제합니다.
+
+연결을 켠 채로 앱을 지웠다면 `~/Library/LaunchAgents/io.github.mac-dungeons-ii.link.plist`를 지우고(로그아웃하거나 `launchctl bootout gui/$(id -u)/io.github.mac-dungeons-ii.link` 실행), `macd2-ui.zip.orig`를 `~/Library/Application Support/minecraft/launcher/launcher.bundle/Contents/Resources/ui.zip` 자리에 다시 복사합니다.
 
 ## 빌드
 
@@ -87,15 +117,15 @@ macd2          로그인, 세션 갱신, 다운로드·풀기, 실행 (xodus)
 - SDL 2.32.10
 - DXMT 68af85e
 - GDK-Proton 11-7 빌트인
+- `.work/src-flightdeck`에 [Flightdeck 포크](https://github.com/MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox) (`macos` 브랜치), 포크의 런타임 패치를 적용한 WineGDK b5d23b0 (`mac/build-store-bridge.sh` 머리말 참고)
 
 순서:
 
-1. `mac/build-store-bridge.sh` — WineGDK 부분과 Flightdeck 프록시
+1. `FD=.work/src-flightdeck mac/build-store-bridge.sh` — WineGDK 부분, Flightdeck 포크의 런타임(`xgameruntime.dll`)과 `XCurl.dll`
 2. `mac/build-runtime.sh` — Wine 런타임
-3. [mcd2-crossover 포크](https://github.com/MaC-Dungeons-II/mcd2-crossover)를 llvm-mingw로 빌드 → `xgameruntime.dll`, `XCurl.dll`
-4. [xodus 포크](https://github.com/MaC-Dungeons-II/xodus)에서 `cargo build --release` (Rust 1.98 이상)
-5. `app/build.sh` → `app/dist/`에 앱 생성
-6. `app/dmg/make_dmg.sh` → `app/dist/MaC-Dungeons-II.dmg` 생성
+3. [xodus 포크](https://github.com/MaC-Dungeons-II/xodus)에서 `cargo build --release` (Rust 1.98 이상)
+4. `app/build.sh` → `app/dist/`에 앱 생성
+5. `app/dmg/make_dmg.sh` → `app/dist/MaC-Dungeons-II.dmg` 생성
 
 앱 아이콘(Icon Composer 형식, Liquid Glass)을 다시 만들려면 다음을 실행합니다.
 
@@ -115,8 +145,7 @@ uv run --no-project --with pillow python app/icon/make_icon.py
 |---|---|---|
 | 런처 앱, 빌드 스크립트, Wine 패치 | 이 저장소 | MIT (Wine 패치는 LGPL-2.1+) |
 | xodus (`macd2`, `macd2-broker`) | [MaC-Dungeons-II/xodus](https://github.com/MaC-Dungeons-II/xodus) | GPL-3.0 |
-| 런타임 프록시 | [MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox](https://github.com/MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox) | LGPL-2.1+ |
-| 런타임 어댑터, XCurl 래퍼 | [MaC-Dungeons-II/mcd2-crossover](https://github.com/MaC-Dungeons-II/mcd2-crossover) | MIT |
+| 런타임(`xgameruntime.dll`), XCurl 래퍼 | [MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox](https://github.com/MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox) | LGPL-2.1+ (XCurl 래퍼는 MIT) |
 | Wine | CodeWeavers crossover-sources 26.3 | LGPL-2.1+ |
 | DXMT, GDK-Proton, WineGDK, GStreamer, FFmpeg, SDL | [app/NOTICE.md](app/NOTICE.md) 참고 | 각 프로젝트 |
 
@@ -126,7 +155,7 @@ uv run --no-project --with pillow python app/icon/make_icon.py
 
 - [xodus](https://github.com/xodus-gaming/xodus) — Microsoft 로그인, 라이선스, 패키지 다운로드
 - [Flightdeck](https://github.com/marselnenaj/flightdeck-msfs-2024-linux-xbox) — GDK 런타임 프록시, Store 브로커
-- [mcd2-crossover](https://github.com/Wanzho/mcd2-crossover) — 정품 런타임을 쓰게 해 준 어댑터
+- [mcd2-crossover](https://github.com/Wanzho/mcd2-crossover)(Wanzho) — 정품 런타임을 처음 쓸 수 있게 해 준 초기 어댑터. XCurl 수정, Wine 대기 큐 수정, 타이틀 설정 기본값은 이 작업을 따랐습니다.
 - [WineGDK](https://github.com/Sightem/WineGDK), [GDK-Proton](https://github.com/LukasPAH/GDK-Proton-Custom) — GDK 빌트인
 - [DXMT](https://github.com/3Shain/dxmt) — Direct3D 11 → Metal
 - CodeWeavers, Wine 프로젝트

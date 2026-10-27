@@ -17,7 +17,7 @@ The Wine runtime in the app is x86_64 and runs under Rosetta 2. Apple's plan:
 | Launcher (`MaCDungeons`), `macd2`, `macd2-broker` | arm64 | unchanged |
 | Wine Unix side, DXMT `winemetal.so`, GStreamer, FFmpeg, SDL, gnutls, freetype | x86_64 | rebuild for arm64 |
 | Wine PE DLLs, DXMT PE DLLs | x86_64 (Windows) | ARM64EC/ARM64X builds |
-| The game, the GDK runtime, mcd2 adapter, Flightdeck proxy | x86_64 (Windows) | unchanged; emulated by FEX inside the ARM64 Wine process |
+| The game, the GDK runtime, the Flightdeck-based runtime and XCurl wrapper | x86_64 (Windows) | unchanged; emulated by FEX inside the ARM64 Wine process |
 
 ## Target
 

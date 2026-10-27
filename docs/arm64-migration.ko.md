@@ -17,7 +17,7 @@
 | 런처(`MaCDungeons`), `macd2`, `macd2-broker` | arm64 | 그대로 |
 | Wine Unix 쪽, DXMT `winemetal.so`, GStreamer, FFmpeg, SDL, gnutls, freetype | x86_64 | arm64로 다시 빌드 |
 | Wine PE DLL, DXMT PE DLL | x86_64 (Windows) | ARM64EC/ARM64X 빌드 |
-| 게임, GDK 런타임, mcd2 어댑터, Flightdeck 프록시 | x86_64 (Windows) | 그대로. ARM64 Wine 프로세스 안에서 FEX가 에뮬레이션 |
+| 게임, GDK 런타임, Flightdeck 기반 런타임, XCurl 래퍼 | x86_64 (Windows) | 그대로. ARM64 Wine 프로세스 안에서 FEX가 에뮬레이션 |
 
 ## 목표 구성
 
