@@ -170,7 +170,8 @@ struct LauncherView: View {
                     .padding(.top, 10)
             default:
                 title(launcher.status)
-                body(launcher.detail)
+                // while downloading the bar below carries the same line
+                if launcher.transfer?.phase != "download" { body(launcher.detail) }
             }
         }
         .frame(maxWidth: 460)
