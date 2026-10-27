@@ -53,6 +53,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var link: MCLauncherLink?
     private var openedByLink = false
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// Opening the app again (Finder, Dock, Spotlight) while it runs out of
+    /// sight for the Minecraft Launcher shows its window and keeps it shown.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        MainActor.assumeIsolated { link?.userReopened() }
+        return true
+    }
     /// macd2://play: Minecraft Launcher's Play button (see mac/mclauncher-link.py
     /// and MCLauncherLink). Opening the app already starts the game.
     func application(_ application: NSApplication, open urls: [URL]) {

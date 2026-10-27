@@ -71,6 +71,12 @@ final class MCLauncherLink {
         NSApp.setActivationPolicy(.accessory)
     }
 
+    /// The user opened the app themselves: the window is theirs from now on.
+    func userReopened() {
+        driven = false
+        reveal()
+    }
+
     func reveal() {
         NSApp.setActivationPolicy(.regular)
         NSApp.unhide(nil)
