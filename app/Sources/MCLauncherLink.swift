@@ -63,13 +63,12 @@ final class MCLauncherLink {
         return windows.first { $0.identifier?.rawValue.hasPrefix("launcher") == true } ?? windows.first
     }
 
-    /// Back out of sight: no window, no Dock icon (other windows, e.g. the key
-    /// layout editor, stay).
+    /// Back out of sight: the app hides (as with ⌘H) and drops its Dock icon.
+    /// Not orderOut: SwiftUI counts the only window going away as the last
+    /// window closing, and the app would quit.
     private func conceal() {
-        launcherWindow?.orderOut(nil)
-        if !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) {
-            NSApp.setActivationPolicy(.accessory)
-        }
+        NSApp.hide(nil)
+        NSApp.setActivationPolicy(.accessory)
     }
 
     func reveal() {
