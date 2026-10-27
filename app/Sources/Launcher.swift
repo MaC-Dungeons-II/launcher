@@ -33,16 +33,6 @@ final class Launcher: ObservableObject {
     private var fetchProcess: Process? = nil
     private enum DownloadStop { case pause, cancel }
     private var downloadStop: DownloadStop? = nil
-    /// wasdmod (keyboard and mouse as a controller) and its key layout; both
-    /// apply from the next game launch.
-    @Published var wasdEnabled = UserDefaults.standard.bool(forKey: "wasdmod.enabled") {
-        didSet { UserDefaults.standard.set(wasdEnabled, forKey: "wasdmod.enabled"); if wasdEnabled != oldValue { offerRestart(Self.wasdRestartMessage) } }
-    }
-    @Published var wasdLayout = UserDefaults.standard.string(forKey: "wasdmod.layout") ?? Launcher.wasdDefaultLayout {
-        didSet { UserDefaults.standard.set(wasdLayout, forKey: "wasdmod.layout"); if wasdLayout != oldValue { offerRestart(Self.wasdRestartMessage) } }
-    }
-    @Published private(set) var wasdLayouts: [String] = []
-
     static let productId = "9P5786PJB9RP"
     static let gameExe = "Dungeons-WinGDK-Shipping.exe"
     let fm = FileManager.default
@@ -70,12 +60,8 @@ final class Launcher: ObservableObject {
     var lockFile: URL { data.appendingPathComponent(".lock") }
     var brokerPidFile: URL { data.appendingPathComponent("broker.pid") }
     var sessionPidFile: URL { data.appendingPathComponent("session-serve.pid") }
-    var wasdBundle: URL { resources.appendingPathComponent("wasdmod") }
-    var wasdData: URL { data.appendingPathComponent("wasdmod") }
-    static let wasdDefaultLayout = "default.txt"
-    static let wasdRestartMessage = "WASD 조작 설정은 게임을 다시 시작해야 적용돼요. 게임에 종료 신호를 보내고, 닫히면 바로 다시 실행해요."
     static let brokerSocket = "/tmp/macd2.sock"
-    static let rotatedLogs = ["game.log", "fetch.log", "broker.log", "session.log", "prefix.log", "wasdmod.log"]
+    static let rotatedLogs = ["game.log", "fetch.log", "broker.log", "session.log", "prefix.log"]
 
     private var helpers: [Process] = []
     private var lastSample: (Date, Double)? = nil
@@ -85,14 +71,11 @@ final class Launcher: ObservableObject {
     private var prepared = false
     /// Wine may be running (prefix setup or the game); quitting must stop it.
     private var usedWine = false
-    private var wasdPresetsCopied = false
     /// The game process (`macd2 run`) is running, with this environment.
     private(set) var gameRunning = false
     private var gameEnv: [String: String]? = nil
     private var stoppingGame = false
-    private var restartPending = false
     private var quitPending = false
-    private var restartPromptOpen = false
 
     // MARK: - Flow
 
@@ -169,8 +152,7 @@ final class Launcher: ObservableObject {
             try await ensureDependencies()
             try await ensureGame()
             try overlayLayer()
-            applyPendingGameControls()
-            try applyWasdmod()
+            removeLegacyWasdmod()
             try await ensurePrefix()
             try await launch()
         } catch is OfflineError {
@@ -542,104 +524,32 @@ final class Launcher: ObservableObject {
         "Z:" + url.path.replacingOccurrences(of: "/", with: "\\")
     }
 
-    // MARK: - wasdmod (https://github.com/Wanzho/mcd2-wasd)
+    // MARK: - Leftovers of the removed wasdmod support
 
-    /// Lists the key layouts in <data>/wasdmod: the bundled presets (refreshed
-    /// once per app launch) and any layout saved from the key layout editor.
-    func refreshWasdLayouts() {
-        try? fm.createDirectory(at: wasdData, withIntermediateDirectories: true)
-        if !wasdPresetsCopied {
-            for name in ["default.txt", "author.txt"] {
-                try? replace(wasdData.appendingPathComponent(name), with: wasdBundle.appendingPathComponent(name))
-            }
-            wasdPresetsCopied = true
-        }
-        let rank = ["default.txt": 0, "author.txt": 1]
-        wasdLayouts = ((try? fm.contentsOfDirectory(atPath: wasdData.path)) ?? [])
-            .filter { $0.lowercased().hasSuffix(".txt") }
-            .sorted { (rank[$0] ?? 2, $0.lowercased()) < (rank[$1] ?? 2, $1.lowercased()) }
-        if !wasdLayouts.contains(wasdLayout) { wasdLayout = Self.wasdDefaultLayout }
-    }
-
-    static func wasdLayoutTitle(_ name: String) -> String {
-        switch name {
-        case "default.txt": return "공식 (게임 기본 키)"
-        case "author.txt": return "추천 (wasdmod 제작자)"
-        default: return wasdLayoutNames[name] ?? name
-        }
-    }
-
-    /// Names of the player's layouts (their files have ASCII names).
-    static var wasdLayoutNames: [String: String] {
-        UserDefaults.standard.dictionary(forKey: "wasdmod.names") as? [String: String] ?? [:]
-    }
-
-    static func setWasdLayoutName(_ file: String, _ name: String?) {
-        var names = wasdLayoutNames
-        names[file] = name
-        UserDefaults.standard.set(names, forKey: "wasdmod.names")
-    }
-
-    private lazy var keyEditor = KeyEditor(launcher: self)
-
-    func openWasdEditor() {
-        keyEditor.show()
-    }
-
-    func openWasdFolder() {
-        refreshWasdLayouts()
-        NSWorkspace.shared.open(wasdData)
-    }
-
-    /// Puts wasdmod's xinput1_4.dll and the chosen layout next to the game, or
-    /// takes them out. The game runs from a RAM-disk view whose files are
-    /// symlinks to the game folder, so the layout and the mod's log are
-    /// symlinks into the data folder: edits apply live and the log survives.
-    private func applyWasdmod() throws {
-        for name in (try? fm.contentsOfDirectory(atPath: gameBinaries.path)) ?? [] where Self.isWasdFile(name) {
+    /// Earlier versions could put wasdmod (keyboard and mouse as a controller)
+    /// next to the game and keep its layouts in <data>/wasdmod; take them out.
+    private func removeLegacyWasdmod() {
+        for name in (try? fm.contentsOfDirectory(atPath: gameBinaries.path)) ?? [] {
+            let n = name.lowercased()
+            guard ["xinput1_4.dll", "default.txt", "author.txt", "wasdmod.log"].contains(n)
+                || (n.hasPrefix("wasd") && (n.hasSuffix(".txt") || n.hasSuffix(".ini") || n.hasSuffix(".flag")))
+            else { continue }   // the game ships none of these names
             try? fm.removeItem(at: gameBinaries.appendingPathComponent(name))
         }
-        guard wasdEnabled else { return }
-        refreshWasdLayouts()
-        resaveWasdLayoutForGame()
-        try replace(gameBinaries.appendingPathComponent("xinput1_4.dll"), with: wasdBundle.appendingPathComponent("xinput1_4.dll"))
-        try fm.createSymbolicLink(at: gameBinaries.appendingPathComponent(wasdLayout),
-                                  withDestinationURL: wasdData.appendingPathComponent(wasdLayout))
-        let log = logs.appendingPathComponent("wasdmod.log")
-        if !fm.fileExists(atPath: log.path) { fm.createFile(atPath: log.path, contents: nil) }
-        try fm.createSymbolicLink(at: gameBinaries.appendingPathComponent("wasdmod.log"), withDestinationURL: log)
-        appendLog("game.log", "launcher: wasdmod on, layout \(wasdLayout)")
+        try? fm.removeItem(at: data.appendingPathComponent("wasdmod"))
+        try? fm.removeItem(at: logs.appendingPathComponent("wasdmod.log"))
+        for key in ["wasdmod.enabled", "wasdmod.layout", "wasdmod.names"] { UserDefaults.standard.removeObject(forKey: key) }
     }
 
-    /// The mod's files; the game ships none with these names.
-    private static func isWasdFile(_ name: String) -> Bool {
-        let n = name.lowercased()
-        return ["xinput1_4.dll", "default.txt", "author.txt", "wasdmod.log"].contains(n)
-            || (n.hasPrefix("wasd") && (n.hasSuffix(".txt") || n.hasSuffix(".ini") || n.hasSuffix(".flag")))
-    }
-
-    /// As wasdmod's own installer does, for the game only: Option is sent as
-    /// Alt (hold left Option for the cursor), and the cursor is kept in the
-    /// window by clipping instead of macOS cursor confinement.
-    private func configureWasdKeys() async {
+    /// ...and the game's Option-as-Alt and cursor-clipping keys it set in the prefix.
+    private func removeLegacyWasdKeys() async {
         let state = prefix.appendingPathComponent(".macd2-wasd-keys")
-        let want = wasdEnabled ? "on" : "off"
-        let applied = (try? String(contentsOf: state, encoding: .utf8)) ?? "off"
-        if applied == want {
-            if !fm.fileExists(atPath: state.path) { try? Data(want.utf8).write(to: state) }
-            return
+        guard let applied = try? String(contentsOf: state, encoding: .utf8) else { return }
+        if applied == "on" {
+            await prefixWine(["reg", "delete", "HKCU\\Software\\Wine\\AppDefaults\\\(Self.gameExe)\\Mac Driver", "/f"])
+            await killWineServer(env: wineEnv, log: "prefix.log")
         }
-        let key = "HKCU\\Software\\Wine\\AppDefaults\\\(Self.gameExe)\\Mac Driver"
-        var code: Int32 = 0
-        if wasdEnabled {
-            for (name, value) in [("LeftOptionIsAlt", "y"), ("RightOptionIsAlt", "y"), ("UseConfinementCursorClipping", "n")] where code == 0 {
-                code = await prefixWine(["reg", "add", key, "/v", name, "/t", "REG_SZ", "/d", value, "/f"])
-            }
-        } else {
-            await prefixWine(["reg", "delete", key, "/f"])
-        }
-        await killWineServer(env: wineEnv, log: "prefix.log")
-        if code == 0 { try? Data(want.utf8).write(to: state) }
+        try? fm.removeItem(at: state)
     }
 
     // MARK: - Wine prefix
@@ -670,7 +580,6 @@ final class Launcher: ObservableObject {
         env["DXMT_METALFX_SPATIAL_SWAPCHAIN"] = env["MACD2_METALFX"] ?? "1"
         env["DXMT_SHADER_CACHE_PATH"] = data.appendingPathComponent("shader-cache").path
         env["WINEDLLOVERRIDES"] = "mscoree,mshtml=;msvcp140,msvcp140_1,msvcp140_2,vcruntime140,vcruntime140_1=n,b;xgameruntime,xcurl=n"
-            + (wasdEnabled ? ";xinput1_4=n,b" : "")
         return env
     }
 
@@ -714,7 +623,7 @@ final class Launcher: ObservableObject {
         syncBuiltins()
         await configureControllers()
         await configureMedia()
-        await configureWasdKeys()
+        await removeLegacyWasdKeys()
         if isNew { try Data().write(to: marker) }
     }
 
@@ -845,15 +754,8 @@ final class Launcher: ObservableObject {
         await killWineServer(env: env, log: "game.log")
         usedWine = false
         stopHelpers()
-        applyPendingGameControls()
         if quitPending {
             NSApp.reply(toApplicationShouldTerminate: true)
-            return
-        }
-        if restartPending {
-            restartPending = false
-            appendLog("game.log", "launcher: restarting the game")
-            start()
             return
         }
         // After the watchdog's or the launcher's stop the exit status is not an error.
@@ -887,29 +789,7 @@ final class Launcher: ObservableObject {
     /// finish quitting (applicationShouldTerminate returned .terminateLater).
     func quitAfterGame() {
         quitPending = true
-        restartPending = false
         stopGame()
-    }
-
-    /// A change that applies on the next launch (a WASD setting, the game's
-    /// own key settings) was made while playing: offer to restart the game now.
-    func offerRestart(_ message: String) {
-        guard gameRunning, !stoppingGame, !restartPromptOpen else { return }
-        restartPromptOpen = true
-        Task { @MainActor in
-            let alert = NSAlert()
-            alert.messageText = "게임을 지금 다시 시작할까요?"
-            alert.informativeText = message
-            alert.addButton(withTitle: "다시 시작")
-            alert.addButton(withTitle: "나중에")
-            NSApp.activate()
-            let restart = alert.runModal() == .alertFirstButtonReturn
-            restartPromptOpen = false
-            if restart && gameRunning && !quitPending {
-                restartPending = true
-                stopGame()
-            }
-        }
     }
 
     /// With MACD2_ADAPTER_LOG=1 in debug.env, keep the mcd2 adapter's
@@ -996,7 +876,6 @@ final class Launcher: ObservableObject {
         }.count
     }
 
-    func appendGameLog(_ line: String) { appendLog("game.log", line) }
 
     private func appendLog(_ name: String, _ line: String) {
         guard let h = logHandle(name) else { return }
