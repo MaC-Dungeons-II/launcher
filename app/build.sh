@@ -5,8 +5,8 @@
 #
 # Inputs (D2, default .work/ in this repo):
 #   runtime-cx/                     Wine (CrossOver sources, mac/build-runtime.sh) + DXMT + WineGDK builtins
-#   build-fd/runtime/xgameruntime.dll   Flightdeck proxy (mac chain patches)
-#   src-mcd2/build/{xgameruntime,XCurl}.dll  mcd2-crossover adapter + curl wrapper (patched)
+#   build-fd/runtime/xgameruntime.dll   runtime (Flightdeck fork, macos branch; mac/build-store-bridge.sh)
+#   src-flightdeck/compat/xcurl/build/XCurl.dll  XCurl wrapper (same fork; mac/build-store-bridge.sh)
 #   src-xodus/xodus/target/release/{xodus-cli,xodus-service}  xodus (mac-fetch, mac-session)
 set -euo pipefail
 
@@ -34,9 +34,8 @@ echo "== wine runtime"
 rsync -a --exclude include --exclude '*.a' --exclude 'share/man' "$D2/runtime-cx/" "$R/wine/"
 
 echo "== compatibility layer"
-cp "$D2/build-fd/runtime/xgameruntime.dll" "$R/layer/xgameruntime-native.dll"
-cp "$D2/src-mcd2/build/xgameruntime.dll" "$R/layer/xgameruntime.dll"
-cp "$D2/src-mcd2/build/XCurl.dll" "$R/layer/XCurl.dll"
+cp "$D2/build-fd/runtime/xgameruntime.dll" "$R/layer/xgameruntime.dll"
+cp "$D2/src-flightdeck/compat/xcurl/build/XCurl.dll" "$R/layer/XCurl.dll"
 
 
 echo "== helpers"
@@ -45,7 +44,6 @@ cp "$D2/src-xodus/xodus/target/release/xodus-service" "$R/bin/macd2-broker"
 
 echo "== licenses"
 cp "$D2/src-xodus/xodus/LICENSE" "$R/licenses/xodus-GPL-3.0.txt"
-cp "$D2/src-mcd2/LICENSE" "$R/licenses/mcd2-crossover-MIT.txt"
 cp "$D2/src-cx/wine/COPYING.LIB" "$R/licenses/wine-LGPL-2.1.txt" 2>/dev/null || true
 cp "$D2/src-cx/wine/LICENSE" "$R/licenses/wine-LICENSE.txt" 2>/dev/null || true
 cp "$D2/src-ffmpeg/ffmpeg-7.1.1/COPYING.LGPLv2.1" "$R/licenses/ffmpeg-LGPL-2.1.txt"

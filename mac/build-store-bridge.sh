@@ -4,7 +4,9 @@
 # which answers only from Microsoft-signed license tokens.
 #
 # Outputs in $OUT/artifacts:
-#   xgameruntime.dll          proxy the game loads (wraps xgameruntime_original.dll)
+#   xgameruntime.dll          the runtime the game loads (wraps the genuine
+#                             runtime, xgameruntime_original.dll)
+#   $FD/compat/xcurl/build/XCurl.dll  XCurl wrapper over curl.se's libcurl
 #   xodus_store_test.dll      Wine builtin User/Store module (PE)
 #   xodus_store_test.so       Unix socket transport to xodus-service ($HOST_ARCH)
 #
@@ -70,4 +72,7 @@ done
 "$WIDL" --win64 -D__WINESRC__ -h -I "$SRC/include" -o "$R/include/xstore.h" "$R/idl/xstore.idl"
 (cd "$R" && sed -e 's/x86_64-w64-mingw32-g++ -std=c++17 /x86_64-w64-mingw32-clang++ -std=c++17 -include type_traits /' build.sh > build-mac.sh && bash build-mac.sh >build.log 2>&1)
 cp "$R/xgameruntime.dll" "$A/"
+
+echo "== XCurl.dll (compat/xcurl)"
+CLANG=/usr/bin/clang LLD_LINK="$MINGW/lld-link" bash "$FD/compat/xcurl/build.sh"
 ls -la "$A"

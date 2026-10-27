@@ -59,6 +59,8 @@ final class Launcher: ObservableObject {
     var gameOld: URL { data.appendingPathComponent("game.old") }
     var lockFile: URL { data.appendingPathComponent(".lock") }
     var brokerPidFile: URL { data.appendingPathComponent("broker.pid") }
+    /// `mac-session --serve`, run by versions with the mcd2 adapter; still
+    /// stopped if one was left running.
     var sessionPidFile: URL { data.appendingPathComponent("session-serve.pid") }
     static let brokerSocket = "/tmp/macd2.sock"
     static let rotatedLogs = ["game.log", "fetch.log", "broker.log", "session.log", "prefix.log"]
@@ -149,7 +151,7 @@ final class Launcher: ObservableObject {
         stage = .working
         do {
             try fm.createDirectory(at: data, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            for dir in [deps, session, logs] { try fm.createDirectory(at: dir, withIntermediateDirectories: true) }
+            for dir in [deps, logs] { try fm.createDirectory(at: dir, withIntermediateDirectories: true) }
             guard try acquireLock() else {
                 stage = .failed
                 set("이미 실행 중이에요.", "다른 M(a)C Dungeons II 창을 닫고 다시 시도해 주세요.")
@@ -159,12 +161,15 @@ final class Launcher: ObservableObject {
                 // once per app launch, before anything touches the game or helpers
                 try restoreGameFolder()
                 rotateLogs()
+                // the removed mcd2 adapter's session file (Xbox tokens) and logs
+                try? fm.removeItem(at: session)
                 await stopStaleHelpers()
                 prepared = true
             }
 
             set("Microsoft 계정 확인 중…")
-            let check = await execute(cli, ["mac-session", session.path], log: "session.log", timeout: 60)
+            // signs in to the Xbox services without writing anything (the runtime signs in by itself)
+            let check = await execute(cli, ["mac-session", session.path, "--check"], log: "session.log", timeout: 60)
             if check.timedOut || check.code == 69 {
                 failOffline()
                 return
@@ -314,8 +319,6 @@ final class Launcher: ObservableObject {
             members: [
                 ("native/260404/windows/bin/x64/xgameruntime.dll", "xgameruntime_original.dll",
                  "815d0c5b0aa5c84eb6104168da551a4922f49f8dd02dbdf3bbc5119beec11b59"),
-                ("native/260404/windows/bin/x64/xgameruntime.thunks.dll", "xgameruntime-adapter-thunks.dll",
-                 "862236063d4872f43435384eb4030dfa4b1fb6fbe91fe93969557de18c5f9601"),
                 ("LICENSE.md", "Microsoft-GDK-LICENSE.md", ""),
             ]),
         Dependency(
@@ -549,27 +552,26 @@ final class Launcher: ObservableObject {
     // MARK: - Compatibility layer in the game folder
 
     private func overlayLayer() throws {
+        // the runtime (Flightdeck-based, over the genuine GDK runtime) and the
+        // XCurl wrapper over curl.se's libcurl
         let sources =
-            ["xgameruntime.dll", "xgameruntime-native.dll", "XCurl.dll"].map { layer.appendingPathComponent($0) } +
-            ["xgameruntime_original.dll", "xgameruntime-adapter-thunks.dll", "curl-compat.dll", "curl-ca-bundle.crt"]
-                .map { deps.appendingPathComponent($0) }
+            ["xgameruntime.dll", "XCurl.dll"].map { layer.appendingPathComponent($0) } +
+            ["xgameruntime_original.dll", "curl-compat.dll", "curl-ca-bundle.crt"].map { deps.appendingPathComponent($0) }
         for src in sources { try replace(gameBinaries.appendingPathComponent(src.lastPathComponent), with: src) }
+        // left by versions that shipped the mcd2-crossover adapter
+        for name in ["xgameruntime-native.dll", "xgameruntime-adapter-thunks.dll", "dungeons-crossover.ini"] {
+            try? fm.removeItem(at: gameBinaries.appendingPathComponent(name))
+        }
         for base in [gameBinaries, gameBinaries.deletingLastPathComponent()] {
             let certs = base.appendingPathComponent("etc/ssl/certs")
             try fm.createDirectory(at: certs, withIntermediateDirectories: true)
             try replace(certs.appendingPathComponent("ca-bundle.crt"), with: caBundle)
         }
-        // The adapter finds its data folder (session.bin, logs) through this sidecar.
-        try Data(windowsPath(session).utf8).write(to: gameBinaries.appendingPathComponent("dungeons-crossover.ini"))
     }
 
     private func replace(_ target: URL, with source: URL) throws {
         try? fm.removeItem(at: target)
         try fm.copyItem(at: source, to: target)
-    }
-
-    private func windowsPath(_ url: URL) -> String {
-        "Z:" + url.path.replacingOccurrences(of: "/", with: "\\")
     }
 
     // MARK: - Leftovers of the removed wasdmod support
@@ -763,10 +765,6 @@ final class Launcher: ObservableObject {
         }
         helpers.append(brokerProcess)
         writePid(brokerProcess, to: brokerPidFile)
-        if let serve = spawn(cli, ["mac-session", session.path, "--serve"], env: nil, log: "session.log") {
-            helpers.append(serve)
-            writePid(serve, to: sessionPidFile)
-        }
         // wait until the broker accepts connections (up to ~10 s)
         let deadline = Date().addingTimeInterval(10)
         while !Self.socketAccepts(Self.brokerSocket) {
@@ -781,7 +779,6 @@ final class Launcher: ObservableObject {
         set("게임 실행 중", "게임을 끄면 런처도 함께 정리돼요")
         usedWine = true
         let watchdog = Task { await self.watchGameExit(env: env) }
-        let adapterLog = Task { await self.keepAdapterLogging() }
         // xodus decrypts the encrypted executable into memory with the
         // account's license on every launch; nothing is written decrypted.
         gameRunning = true
@@ -796,7 +793,6 @@ final class Launcher: ObservableObject {
         let stoppedByLauncher = stoppingGame
         stoppingGame = false
         watchdog.cancel()
-        adapterLog.cancel()
         let stoppedByWatchdog = await watchdog.value
         appendLog("game.log", "launcher: game process ended with code \(code)\(stoppedByWatchdog ? " after the exit watchdog stopped Wine" : "")")
         await killWineServer(env: env, log: "game.log")
@@ -838,22 +834,6 @@ final class Launcher: ObservableObject {
     func quitAfterGame() {
         quitPending = true
         stopGame()
-    }
-
-    /// With MACD2_ADAPTER_LOG=1 in debug.env, keep the mcd2 adapter's
-    /// diagnostics (session/http.log, runtime.log: request shapes and status,
-    /// never token values) on while playing. The adapter honours a flag for at
-    /// most an hour, so a fresh one-hour flag is written every 30 minutes.
-    private func keepAdapterLogging() async {
-        let flag = session.appendingPathComponent("logging.enabled")
-        guard debugOverrides()["MACD2_ADAPTER_LOG"] == "1" else { return }
-        while !Task.isCancelled {
-            let now = Int(Date().timeIntervalSince1970)
-            let body = "{\"version\":1,\"started\":\(now),\"expires\":\(now + 3600)}"
-            try? Data(body.utf8).write(to: flag, options: .atomic)
-            try? await Task.sleep(nanoseconds: 30 * 60 * 1_000_000_000)
-        }
-        try? fm.removeItem(at: flag)
     }
 
     /// The game opens, and goes fullscreen, on Windows' primary monitor, which
