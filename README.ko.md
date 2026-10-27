@@ -105,7 +105,7 @@ macd2          로그인, 세션 갱신, 다운로드·풀기, 실행 (xodus)
 1. `mac/build-store-bridge.sh` — WineGDK 부분과 Flightdeck 프록시
 2. `mac/build-runtime.sh` — Wine 런타임
 3. [mcd2-crossover 포크](https://github.com/MaC-Dungeons-II/mcd2-crossover)를 llvm-mingw로 빌드 → `xgameruntime.dll`, `XCurl.dll`
-4. [xodus 포크](https://github.com/MaC-Dungeons-II/xodus)에서 `cargo build --release`
+4. [xodus 포크](https://github.com/MaC-Dungeons-II/xodus)에서 `cargo build --release` (Rust 1.98 이상)
 5. `mac/build-wasdmod.sh` — wasdmod `xinput1_4.dll` (먼저 [Wanzho/mcd2-wasd](https://github.com/Wanzho/mcd2-wasd)를 `.work/src-wasd`에 clone)
 6. `app/build.sh` → `app/dist/`에 앱 생성
 7. `app/dmg/make_dmg.sh` → `app/dist/MaC-Dungeons-II.dmg` 생성

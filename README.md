@@ -105,7 +105,7 @@ Order:
 1. `mac/build-store-bridge.sh` — WineGDK pieces and the Flightdeck proxy
 2. `mac/build-runtime.sh` — Wine runtime
 3. Build the [mcd2-crossover fork](https://github.com/MaC-Dungeons-II/mcd2-crossover) with llvm-mingw → `xgameruntime.dll`, `XCurl.dll`
-4. `cargo build --release` in the [xodus fork](https://github.com/MaC-Dungeons-II/xodus)
+4. `cargo build --release` in the [xodus fork](https://github.com/MaC-Dungeons-II/xodus) (Rust 1.98 or later)
 5. `mac/build-wasdmod.sh` — wasdmod `xinput1_4.dll` (clone [Wanzho/mcd2-wasd](https://github.com/Wanzho/mcd2-wasd) into `.work/src-wasd` first)
 6. `app/build.sh` → app in `app/dist/`
 7. `app/dmg/make_dmg.sh` → `app/dist/MaC-Dungeons-II.dmg`
