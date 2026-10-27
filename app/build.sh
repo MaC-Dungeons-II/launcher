@@ -27,6 +27,8 @@ mkdir -p "$C/MacOS" "$R/bin" "$R/layer" "$R/licenses"
 cp "$HERE/build/MaCDungeons" "$C/MacOS/MaCDungeons"
 cp "$HERE/Info.plist" "$C/Info.plist"
 cp "$HERE/icon/compiled/AppIcon.icns" "$HERE/icon/compiled/Assets.car" "$HERE/icon/dock-mask.png" "$R/"   # from icon/make_icon.py (Icon Composer document)
+mkdir -p "$R/mclauncher"
+cp "$HERE"/Resources/mclauncher/{patch.json,mclauncher-link.js,agent-handler.sh} "$R/mclauncher/"   # optional Minecraft Launcher link (MCLauncherPatch.swift)
 
 echo "== wine runtime"
 rsync -a --exclude include --exclude '*.a' --exclude 'share/man' "$D2/runtime-cx/" "$R/wine/"

@@ -1,0 +1,79 @@
+{
+ "comment": "Edits to Minecraft Launcher's ui.zip JS for Dungeons II (MCLauncherPatch.swift). A group with requireAll applies to a file only when every find matches there; regex finds use NSRegularExpression templates ($1) and replace every match. The main bundle (mainBundle) gets mclauncher-link.js prepended, other changed files only the marker.",
+ "marker": "/*macd2-link*/",
+ "mainBundle": "/js/app.",
+ "minFiles": 5,
+ "groups": [
+  {
+   "name": "playable-and-routes",
+   "requireAll": true,
+   "edits": [
+    {
+     "find": "updatePlayable:(e,t)=>{e.productGameConfigs[t.payload.productId].playable=t.payload.value}",
+     "replace": "updatePlayable:(e,t)=>{e.productGameConfigs[t.payload.productId].playable=\"dungeons2\"===t.payload.productId||t.payload.value}"
+    },
+    {
+     "find": "\\b(play|download|hardRepair):([A-Za-z$_][\\w$]*)\\.(launchProduct|installProduct|repairProduct),",
+     "replace": "$1:(p,...a)=>\"dungeons2\"===p?window.__macd2():$2.$3(p,...a),",
+     "regex": true
+    }
+   ]
+  },
+  {
+   "name": "button",
+   "requireAll": true,
+   "edits": [
+    {
+     "find": "F=!!X&&X.isInstalled",
+     "replace": "F=\"dungeons2\"===e?window.__macd2Installed():!!X&&X.isInstalled"
+    },
+    {
+     "find": "_=(0,c.useCallback)(((e,a)=>{(0,r.YW)(Q,{play:",
+     "replace": "_=(0,c.useCallback)(((e,a)=>{if(\"dungeons2\"===Y.productId)return void window.__macd2();(0,r.YW)(Q,{play:"
+    },
+    {
+     "find": "const E=({productId:e,versionId:t,render:a})=>{var E,h,b,x,C,w,y,M,f,v;",
+     "replace": "const E=({productId:e,versionId:t,render:a})=>{var E,h,b,x,C,w,y,M,f,v;const MD=window.__macd2Use(c,e);"
+    },
+    {
+     "find": "a(_,J,L,O,F))};a.d(t,[\"A\",0,E])",
+     "replace": "a(_,MD||J,L,O,F))};a.d(t,[\"A\",0,E])"
+    }
+   ]
+  },
+  {
+   "name": "bar-text",
+   "requireAll": false,
+   "edits": [
+    {
+     "find": "if(s===c.N3.Downloading){const e=\"\\u2069\";return`${_} ${\"\\u2066\"}${o()(i,{locale:\"en-us\"})} / ${o()(n,{locale:\"en-us\"})}${e}`}return u?r.createElement(r.Fragment,null,_,\" \",u(s)):_}),[s,u,_,i,n])",
+     "replace": "const U=u&&u(s);if(s===c.N3.Downloading){const e=\"\\u2069\";return`${_} ${\"\\u2066\"}${o()(i,{locale:\"en-us\"})} / ${o()(n,{locale:\"en-us\"})}${e}`+(U&&U.macd2?\" (\"+(U.speed?o()(U.speed,{locale:\"en-us\"})+\"/s, \":\"\")+U.text+\")\":\"\")}return U&&U.macd2?U.text:u?r.createElement(r.Fragment,null,_,\" \",U):_}),[s,u,_,i,n])"
+    }
+   ]
+  },
+  {
+   "name": "bar",
+   "requireAll": false,
+   "edits": [
+    {
+     "find": "return n.createElement(n.Fragment,null,t)}},2735(",
+     "replace": "return n.createElement(n.Fragment,null,t,window.__macd2Bar(n,s.M))}},2735("
+    }
+   ]
+  },
+  {
+   "name": "notices",
+   "requireAll": false,
+   "edits": [
+    {
+     "find": "return n.hasPlatformSupport?null:a.createElement(c.ZT,{id:`IncompatibleDeviceAlert_${t}`",
+     "replace": "if(\"dungeons2\"===t)return a.createElement(c.ZT,{id:\"IncompatibleDeviceAlert_macd2\",isOpen:!i,message:a.createElement(a.Fragment,null,window.__macd2T(\"banner\"),\" \",a.createElement(\"a\",{href:window.__macd2Repo,className:\"external-link external-link-light\",target:\"_blank\",rel:\"noopener noreferrer\"},window.__macd2T(\"repo\"))),onClose:()=>l(!0),severity:\"Info\",position:\"Bottom\"});return n.hasPlatformSupport?null:a.createElement(c.ZT,{id:`IncompatibleDeviceAlert_${t}`"
+    },
+    {
+     "find": "{ownsGame:r,title:o}=(0,Ae.Vt)(l);return a.createElement(Bt,{message:(0,u.YW)(e,{osx:",
+     "replace": "{ownsGame:r,title:o}=(0,Ae.Vt)(l);if(\"dungeons2\"===l)return a.createElement(Bt,{message:a.createElement(a.Fragment,null,a.createElement(\"strong\",null,window.__macd2T(\"head\")),\" \",window.__macd2T(\"body\"))},a.createElement(Wt,null,a.createElement(m.z9,{theme:n,typeramp:i,href:window.__macd2Repo,target:\"_blank\",rel:\"noopener noreferrer\",ariaLabel:window.__macd2T(\"repo\")},window.__macd2T(\"repo\"))));return a.createElement(Bt,{message:(0,u.YW)(e,{osx:"
+    }
+   ]
+  }
+ ]
+}

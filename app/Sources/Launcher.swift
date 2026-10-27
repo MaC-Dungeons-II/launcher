@@ -9,7 +9,7 @@ import CryptoKit
 @MainActor
 final class Launcher: ObservableObject {
     enum Stage: Equatable {
-        case idle, working, needsConsent, needsLogin, playing, failed, paused
+        case idle, working, needsConsent, needsLogin, ready, playing, failed, paused
     }
 
     @Published var stage: Stage = .idle {
@@ -79,8 +79,46 @@ final class Launcher: ObservableObject {
 
     // MARK: - Flow
 
+    /// Checks the account and the license, then waits at .ready for Install /
+    /// Play (or goes straight on when Play was asked for).
     func start() {
-        Task { await run() }
+        guard !running else { return }
+        running = true
+        Task { await run(); running = false }
+    }
+
+    /// Install or Play: from the window, or Minecraft Launcher's Play button.
+    func play() {
+        autoLaunch = true
+        switch stage {
+        case .paused: resumeDownload()
+        case .working, .playing: break   // the run under way goes on to the game
+        default: start()
+        }
+    }
+
+    /// Set by MCLauncherLink when Minecraft Launcher drives the app: it quits
+    /// when the game ends or the download is cancelled, instead of going back
+    /// to its window.
+    var drivenByMinecraftLauncher = false
+    private var running = false
+    private var autoLaunch = false
+
+    /// Back to the Install / Play state (the window), or quit when the
+    /// Minecraft Launcher drives the app.
+    private func finishRun() {
+        autoLaunch = false
+        if drivenByMinecraftLauncher { NSApp.terminate(nil); return }
+        stage = .ready
+        setReady()
+    }
+
+    private func setReady() {
+        if gameInstalled {
+            set("플레이할 준비가 됐어요", "업데이트가 있으면 플레이할 때 먼저 받아요.")
+        } else {
+            set("게임이 아직 설치되지 않았어요", "설치를 누르면 Microsoft에서 게임(약 9.6 GB)을 내려받아요.")
+        }
     }
 
     func acceptLicense() {
@@ -148,6 +186,12 @@ final class Launcher: ObservableObject {
                     "게임이 쓰는 Xbox 런타임(Microsoft GDK)을 Microsoft에서 직접 내려받아요.")
                 return
             }
+            guard autoLaunch else {
+                stage = .ready
+                setReady()
+                return
+            }
+            autoLaunch = false
             try await ensureRosetta()
             try await ensureDependencies()
             try await ensureGame()
@@ -159,7 +203,7 @@ final class Launcher: ObservableObject {
             failOffline()
         } catch let stopped as DownloadStopped {
             if stopped.cancelled {
-                NSApp.terminate(nil)   // as if Play was never pressed
+                finishRun()   // as if Install was never pressed
             } else {
                 let last = transfer
                 stage = .paused
@@ -432,12 +476,16 @@ final class Launcher: ObservableObject {
     func cancelDownload() {
         if stage == .paused {
             discardPartialDownload()
-            NSApp.terminate(nil)
+            finishRun()
         } else {
             stopDownload(.cancel)
         }
     }
-    func resumeDownload() { if stage == .paused { start() } }
+    func resumeDownload() {
+        guard stage == .paused else { return }
+        autoLaunch = true
+        start()
+    }
 
     /// Only while downloading: stopping the extraction would discard the package.
     private func stopDownload(_ stop: DownloadStop) {
@@ -762,7 +810,7 @@ final class Launcher: ObservableObject {
         if code != 0 && code != 1 && !stoppedByWatchdog && !stoppedByLauncher {
             fail("게임이 비정상 종료됐어요 (코드 \(code)).")
         } else {
-            NSApp.terminate(nil)
+            finishRun()
         }
     }
 

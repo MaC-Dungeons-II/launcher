@@ -5,15 +5,18 @@ import SwiftUI
 struct MaCDungeonsApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject private var launcher = Launcher()
+    @StateObject private var mcLauncher = MCLauncherPatch()
 
     var body: some Scene {
         Window("M(a)C Dungeons II", id: "launcher") {
             LauncherView()
                 .environmentObject(launcher)
+                .environmentObject(mcLauncher)
                 .frame(width: 560, height: 340)
                 .onAppear {
                     delegate.launcher = launcher
                     launcher.start()
+                    Task { await mcLauncher.keepApplied() }   // after a Minecraft Launcher update
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -28,7 +31,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let launcher, link == nil else { return }
                 link = MCLauncherLink(launcher: launcher)
                 link?.start()
-                if openedByLink { link?.openedFromMinecraftLauncher() }
+                if openedByLink {
+                    link?.openedFromMinecraftLauncher()
+                    launcher.play()
+                }
             }
         }
     }
@@ -41,15 +47,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated { link?.userReopened() }
         return true
     }
-    /// macd2://play: Minecraft Launcher's Play button (see mac/mclauncher-link.py
-    /// and MCLauncherLink). Opening the app already starts the game.
+    /// macd2://play: Minecraft Launcher's Play button (MCLauncherLink): go
+    /// straight on to the game.
     func application(_ application: NSApplication, open urls: [URL]) {
         MainActor.assumeIsolated {
             guard urls.contains(where: { $0.scheme == "macd2" }) else { return }
             guard let launcher, let link else { openedByLink = true; return }   // still launching
-            if launcher.stage == .failed { launcher.start() }
-            launcher.resumeDownload()   // Play on a paused download
             link.openedFromMinecraftLauncher()
+            launcher.play()
         }
     }
     /// While playing, the game is asked to close first; the launcher replies
@@ -85,6 +90,7 @@ enum MCL {
 
 struct LauncherView: View {
     @EnvironmentObject var launcher: Launcher
+    @EnvironmentObject var mcLauncher: MCLauncherPatch
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -154,6 +160,11 @@ struct LauncherView: View {
             case .failed:
                 title(launcher.status, color: MCL.red)
                 body(launcher.detail)
+            case .ready:
+                title(launcher.status)
+                body(launcher.detail)
+                MinecraftLauncherLinkRow()
+                    .padding(.top, 10)
             default:
                 title(launcher.status)
                 body(launcher.detail)
@@ -211,7 +222,11 @@ struct LauncherView: View {
                     .buttonStyle(PlayButton())
                     .keyboardShortcut(.defaultAction)
             case .failed:
-                Button("다시 시도") { launcher.start() }
+                Button("다시 시도") { launcher.play() }
+                    .buttonStyle(PlayButton())
+                    .keyboardShortcut(.defaultAction)
+            case .ready:
+                Button(launcher.gameInstalled ? "플레이" : "설치") { launcher.play() }
                     .buttonStyle(PlayButton())
                     .keyboardShortcut(.defaultAction)
             case .playing:
@@ -236,6 +251,69 @@ struct LauncherView: View {
         guard let p = launcher.progress else { return "준비 중" }
         return "\(Int((p * 100).rounded()))%"
     }
+}
+
+/// The optional link to the Minecraft Launcher (MCLauncherPatch): a switch
+/// with what it does, asked once before turning it on.
+struct MinecraftLauncherLinkRow: View {
+    @EnvironmentObject var link: MCLauncherPatch
+
+    var body: some View {
+        if link.state != .notInstalled {
+            VStack(spacing: 5) {
+                Toggle(isOn: Binding(get: { link.state == .on }, set: { on in on ? confirmOn() : turnOff() })) {
+                    Text("Minecraft Launcher에서도 플레이")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(MCL.light1)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .tint(MCL.green5)
+                .disabled(link.busy)
+                Text(caption)
+                    .font(.system(size: 11))
+                    .foregroundStyle(isFailed ? MCL.red : MCL.light5)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(MCL.grey4)
+            .overlay(Rectangle().stroke(MCL.grey3, lineWidth: 1))
+        }
+    }
+
+    private var isFailed: Bool { if case .failed = link.state { return true } else { return false } }
+
+    private var caption: String {
+        if link.busy { return "Minecraft Launcher에 연결하는 중…" }
+        switch link.state {
+        case .on: return "Minecraft Launcher의 Dungeons II 플레이 버튼으로도 이 앱이 게임을 실행해요."
+        case .failed(let message): return message
+        default: return "선택 기능이에요. 켜면 Minecraft Launcher의 Dungeons II 화면에서도 플레이할 수 있어요."
+        }
+    }
+
+    private func confirmOn() {
+        let alert = NSAlert()
+        alert.messageText = "Minecraft Launcher에 연결할까요?"
+        alert.informativeText = """
+        Minecraft Launcher의 Dungeons II 화면에 플레이 버튼이 생기고, 누르면 이 앱이 뒤에서 게임을 내려받고 실행해요.
+
+        • Minecraft Launcher의 화면 파일을 Dungeons II 부분만 고쳐요. 원본은 따로 보관하고, 끄면 되돌려요.
+        • 이 Mac 사용자 계정에 작은 백그라운드 항목(LaunchAgent)을 설치해요.
+        • macOS가 이 앱이 다른 앱을 수정하도록 허용할지 물을 수 있어요.
+
+        Mojang·Microsoft와 관계없는 비공식 기능이에요.
+        """
+        alert.addButton(withTitle: "연결")
+        alert.addButton(withTitle: "취소")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        Task { await link.turnOn() }
+    }
+
+    private func turnOff() { Task { await link.turnOff() } }
 }
 
 /// Minecraft Launcher's download bar: dark track, green fill, text inside.

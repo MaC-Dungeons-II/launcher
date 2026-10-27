@@ -1,4 +1,4 @@
-// Minecraft Launcher's Dungeons II page, patched by mac/mclauncher-link.py,
+// Minecraft Launcher's Dungeons II page, patched by MCLauncherPatch,
 // starts this app with Play (`open -g -j macd2://play`, hidden) and then shows
 // its state in place of the Play button: it polls http://127.0.0.1:47822/status
 // and posts /pause, /resume and /cancel (its download bar) and /show,
@@ -21,7 +21,9 @@ final class MCLauncherLink {
     private var stageWatch: AnyCancellable?
     /// Started from Minecraft Launcher's Play button: the launcher shows the
     /// progress, this app's window only what needs the user.
-    private(set) var driven = false
+    private(set) var driven = false {
+        didSet { launcher?.drivenByMinecraftLauncher = driven }
+    }
 
     init(launcher: Launcher) {
         self.launcher = launcher
@@ -138,7 +140,7 @@ final class MCLauncherLink {
         case ("POST", "/cancel"):
             launcher.cancelDownload()
         case ("POST", "/retry"):
-            if launcher.stage == .failed { launcher.start() } else { reveal() }
+            if launcher.stage == .failed { launcher.play() } else { reveal() }
         default:
             return Self.reply(404)
         }
@@ -147,7 +149,7 @@ final class MCLauncherLink {
 
     private func status(of launcher: Launcher) -> Data {
         let stage: String = switch launcher.stage {
-        case .idle: "idle"
+        case .idle, .ready: "idle"   // waiting for Install / Play
         case .working: "working"
         case .needsConsent: "needsConsent"
         case .needsLogin: "needsLogin"

@@ -1,4 +1,4 @@
-// Injected at the top of Minecraft Launcher's main bundle by mclauncher-link.py.
+// Injected at the top of Minecraft Launcher's main bundle by MCLauncherPatch.swift (patch.json).
 // Dungeons II only: Play goes to M(a)C Dungeons II, whose state (from the app's
 // http://127.0.0.1:47822/status) then drives the Play button and the
 // launcher's own download bar, as Minecraft: Java Edition's downloads do.
@@ -151,7 +151,7 @@
         onPause: function () { post("pause"); },
         onResume: function () { post("resume"); },
         onCancel: function () { post("cancel"); },
-        // the app's own words stand alone (patched bar text, see mclauncher-link.py)
+        // the app's own words stand alone (patched bar text, see patch.json)
         additionalStateText: function () { return d.note ? { macd2: true, text: d.note, speed: d.speed } : null; },
       });
     };
