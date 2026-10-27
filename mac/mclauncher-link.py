@@ -145,9 +145,9 @@ BUTTON = [
 ]
 # the download bar's text: an additionalStateText of {macd2, text} replaces the
 # phase word ("Preparing …") instead of following it, and while downloading
-# follows the byte counts (speed and time left)
+# follows the byte counts in parentheses (speed, time left)
 BAR_TEXT = (r'if(s===c.N3.Downloading){const e="\u2069";return`${_} ${"\u2066"}${o()(i,{locale:"en-us"})} / ${o()(n,{locale:"en-us"})}${e}`}return u?r.createElement(r.Fragment,null,_," ",u(s)):_}),[s,u,_,i,n])',
-            r'const U=u&&u(s);if(s===c.N3.Downloading){const e="\u2069";return`${_} ${"\u2066"}${o()(i,{locale:"en-us"})} / ${o()(n,{locale:"en-us"})}${e}`+(U&&U.macd2?" · "+U.text:"")}return U&&U.macd2?U.text:u?r.createElement(r.Fragment,null,_," ",U):_}),[s,u,_,i,n])')
+            r'const U=u&&u(s);if(s===c.N3.Downloading){const e="\u2069";return`${_} ${"\u2066"}${o()(i,{locale:"en-us"})} / ${o()(n,{locale:"en-us"})}${e}`+(U&&U.macd2?" ("+U.text+")":"")}return U&&U.macd2?U.text:u?r.createElement(r.Fragment,null,_," ",U):_}),[s,u,_,i,n])')
 # the app's progress in the launcher's download bar (every product's bar is listed here)
 BAR = ("return n.createElement(n.Fragment,null,t)}},2735(",
        "return n.createElement(n.Fragment,null,t,window.__macd2Bar(n,s.M))}},2735(")
