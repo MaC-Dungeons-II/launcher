@@ -1,94 +1,55 @@
+<div align="center">
+
+<img src="app/icon/AppIcon-preview.png" width="128" alt="">
+
 # M(a)C Dungeons II
 
 **English** · [한국어](README.ko.md)
 
-An unofficial launcher that runs **Minecraft Dungeons II** (Minecraft Launcher / Microsoft Store edition) on a Mac.
+</div>
 
-> [!CAUTION]
-> This is an unofficial project. Use it at your own risk. It is not affiliated with, endorsed by, or sponsored by Mojang, Microsoft or Xbox. Minecraft, Minecraft Dungeons and all other trademarks, product names, and company names or logos mentioned here are the property of their respective owners.
+M(a)C Dungeons II runs **Minecraft Dungeons II** (Minecraft Launcher / Microsoft Store edition) on Apple Silicon Macs. Sign in with the Microsoft account that owns the game, and the app downloads and runs it. It is built on Wine (CrossOver 26.3), [DXMT](https://github.com/3Shain/dxmt), a [Flightdeck](https://github.com/marselnenaj/flightdeck-msfs-2024-linux-xbox)-based GDK runtime and [xodus](https://github.com/xodus-gaming/xodus).
 
-> [!IMPORTANT]
-> **You need an account that owns the game.** The license check is not bypassed; the game won't run on an account that doesn't own it.
+Unofficial, and not affiliated with or endorsed by Mojang, Microsoft or Xbox.
 
-## What works
+## Features
 
-Checked on an M4 MacBook (macOS 27): online play with the heroes you already have, settings and saves, game videos, Bluetooth Xbox controllers. A game update may break things.
+- Online play with your existing heroes
+- Settings and saves (kept on the Mac)
+- Game videos and Bluetooth Xbox controllers
+- Download with pause and resume
+- Optional: start the game from the Mac Minecraft Launcher
 
-Not yet: saves stay on the Mac (no Xbox cloud sync), and every game update downloads the full package again.
+## System Requirements
 
-## Requirements
+- Apple Silicon Mac with Rosetta 2
+- macOS 14 or later
+- About 25 GB of free space
 
-- Apple Silicon Mac with Rosetta 2, macOS 14 or later
-- A Microsoft account that owns Minecraft Dungeons II
-- About 25 GB free for the first install
+## Installation
 
-## Install
+Download `MaC-Dungeons-II.dmg` from [Releases](../../releases/latest) and drag the app to Applications.
 
-1. Get `MaC-Dungeons-II.dmg` from [Releases](../../releases), open it, and drag the app to Applications.
-2. Open the app. If macOS won't open it, click **Open Anyway** in **System Settings → Privacy & Security**.
+## Problems
 
-## Play
+Tested on an M4 MacBook (macOS 27). A game update may break things. Please [open an issue](../../issues) with the logs from `~/Library/Application Support/M(a)C Dungeons II/logs`.
 
-1. Sign in with your Microsoft account. This is separate from the Minecraft Launcher's sign-in.
-2. Accept the Microsoft GDK license (once).
-3. Click **설치** (Install), or **플레이** (Play) once the game is installed.
+## Development
 
-## Play from the Minecraft Launcher (optional)
-
-If the Mac Minecraft Launcher is installed, you can start Dungeons II from there too. Turn on **Minecraft Launcher에서도 플레이** ("Also play from the Minecraft Launcher") on the app's ready-to-play screen, or from **File → Minecraft Launcher 연결…**.
-
-The Dungeons II page in the Minecraft Launcher then has an Install/Play button and shows the download there. This app runs hidden and only shows its window when you need to do something, like signing in.
-
-To do this the app modifies the Minecraft Launcher, so macOS asks you to allow it under **App Management**. Turning the switch off puts the Minecraft Launcher back the way it was.
-
-## Uninstall
-
-1. If you turned on the Minecraft Launcher link, turn it off in the app first.
-2. Delete the app.
-3. Delete `~/Library/Application Support/M(a)C Dungeons II` (the game and your saves).
-4. In Keychain Access, delete the items named "M(a)C Dungeons II".
-
-Already deleted the app with the link on? See [Removing the Minecraft Launcher link by hand](docs/architecture.md#removing-the-link-by-hand).
-
-## How it works
-
-The game is a Windows GDK title. On a Mac it runs in Wine with our own GDK runtime in its folder.
-
-```
-Dungeons-WinGDK-Shipping.exe
- ├─ xgameruntime.dll            Flightdeck-based runtime (our fork)
- │   └─ xgameruntime_original.dll  Microsoft's GDK runtime (downloaded)
- └─ XCurl.dll                   wrapper over curl.se's libcurl (same fork)
-xodus_store_test.dll ── /tmp/macd2.sock ── macd2-broker   Store licenses (xodus)
-macd2          sign-in, download/extract, launch (xodus)
-```
-
-- Sign-in happens on the Mac (`macd2 mac-session`). The runtime gets the game's Xbox Live tokens from a session file; the refresh token stays in the keychain, outside Wine.
-- Store licenses are checked against your account's Microsoft-signed license through `macd2-broker`.
-- Wine is built from CodeWeavers' CrossOver 26.3 sources. DXMT draws Direct3D 11 with Metal, GStreamer plays the game's videos, SDL handles controllers.
-- Saves are kept in the Wine prefix. Heroes live on the game's servers.
-
-Details: [docs/architecture.md](docs/architecture.md).
-
-## For developers
-
-- Building: [docs/building.md](docs/building.md)
-
-| Component | Repository | License |
-|---|---|---|
-| Launcher app, build scripts, Wine patches | this repo | MIT (Wine patches LGPL-2.1+) |
-| xodus (`macd2`, `macd2-broker`) | [MaC-Dungeons-II/xodus](https://github.com/MaC-Dungeons-II/xodus) | GPL-3.0 |
-| Runtime (`xgameruntime.dll`), XCurl wrapper | [MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox](https://github.com/MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox) | LGPL-2.1+ (XCurl wrapper MIT) |
-| Wine | CodeWeavers crossover-sources 26.3 | LGPL-2.1+ |
-| DXMT, GDK-Proton, WineGDK, GStreamer, FFmpeg, SDL | see [app/NOTICE.md](app/NOTICE.md) | per project |
-
-This repo and the release contain no Microsoft or Mojang files; the app downloads the game and the GDK runtime itself.
+- [How it works](docs/architecture.md)
+- [Building](docs/building.md)
 
 ## Credits
 
 - [xodus](https://github.com/xodus-gaming/xodus) — Microsoft sign-in, licenses, package downloads
-- [Flightdeck](https://github.com/marselnenaj/flightdeck-msfs-2024-linux-xbox) — GDK runtime proxy, Store broker
-- [mcd2-crossover](https://github.com/Wanzho/mcd2-crossover) by Wanzho — the early adapter that first made the genuine runtime usable; our XCurl fixes, the Wine wait-queue fix, the title-config default and the XUser interface layout follow its work
+- [Flightdeck](https://github.com/marselnenaj/flightdeck-msfs-2024-linux-xbox) — GDK runtime
+- [mcd2-crossover](https://github.com/Wanzho/mcd2-crossover) by Wanzho — XCurl and Wine fixes, XUser layout
 - [WineGDK](https://github.com/Sightem/WineGDK), [GDK-Proton](https://github.com/LukasPAH/GDK-Proton-Custom) — GDK builtins
-- [DXMT](https://github.com/3Shain/dxmt) — Direct3D 11 → Metal
-- CodeWeavers, the Wine project
+- [DXMT](https://github.com/3Shain/dxmt) — Direct3D 11 on Metal
+- CodeWeavers and the Wine project
+
+## License
+
+MIT. Bundled components keep their own licenses; see [app/NOTICE.md](app/NOTICE.md). Our changes to xodus and Flightdeck are in the [MaC-Dungeons-II](https://github.com/MaC-Dungeons-II) forks.
+
+Minecraft and Minecraft Dungeons are trademarks of their respective owners.

@@ -21,8 +21,8 @@ Layers 1 and 3 come from the [Flightdeck fork](https://github.com/MaC-Dungeons-I
 
 | GDK API | Answered by | Notes |
 |---|---|---|
-| XUser (the signed-in user, Xbox Live tokens) | 1, from the session file | The genuine runtime can't sign in under Wine. The launcher signs in on the Mac side (`macd2 mac-session`) and writes a session file with the account's identity and its tokens for the title's services. The runtime reads it (`MacUser.cpp`, folder in `XODUS_MAC_SESSION`) and asks for a renewed file when the game forces a refresh. No refresh credential enters Wine. |
-| XStore (license, entitlements, package updates) | 1 → xodus store module (`xodus_store_test.dll`) → `macd2-broker` | Ownership comes from the Microsoft-signed license token for the signed-in account. Nothing is hard-coded. |
+| XUser (the signed-in user, Xbox Live tokens) | 1, from the session file | The genuine runtime can't sign in under Wine. The launcher signs in on the Mac side (`macd2 mac-session`) and writes a session file with the account's identity and its tokens for the title's services. The runtime reads it (`MacUser.cpp`, folder in `XODUS_MAC_SESSION`) and asks for a renewed file when the game forces a refresh. |
+| XStore (license, entitlements, package updates) | 1 → xodus store module (`xodus_store_test.dll`) → `macd2-broker` | Ownership comes from the Microsoft-signed license token for the signed-in account. |
 | XGameSave | 1, local store | Saves are kept in `C:\gamesave` in the prefix (`XODUS_LOCAL_GAMESAVE=1`) and stay on the Mac; they are not uploaded to the Xbox cloud. Users come from the session file, so handles match. |
 | XNetworking (connectivity, TLS policy per URL for libHttpClient's websockets) | 1 | Answered by the runtime itself. Wine on macOS reports no default route, so connectivity comes from a probe to an Internet host. |
 | XGame, XThreading (XAsync, task queues), everything else | 2. genuine runtime | The runtime forwards unknown classes unchanged. |
@@ -71,9 +71,15 @@ Off unless the user turns it on in the app (`MCLauncherPatch.swift`, `app/Resour
 ## Data on the Mac
 
 - Everything is in `~/Library/Application Support/M(a)C Dungeons II`: the game, the Wine prefix (with the local saves in `C:\gamesave`), the session file and logs.
-- The Microsoft account's refresh token is kept in the macOS keychain (service "M(a)C Dungeons II"). It stays outside Wine.
+- The Microsoft account's refresh token is kept in the macOS keychain (service "M(a)C Dungeons II").
 - The GDK runtime is downloaded from nuget.org after the user accepts its license, and checked against a pinned SHA-256. curl comes from curl.se the same way.
 - The game's encrypted executables stay encrypted on disk; `macd2 run` decrypts them into a RAM disk at launch.
+
+## Uninstalling
+
+1. If the Minecraft Launcher link is on, turn it off in the app first.
+2. Delete the app and `~/Library/Application Support/M(a)C Dungeons II` (the game and local saves).
+3. In Keychain Access, delete the items named "M(a)C Dungeons II".
 
 ## Removing the link by hand
 

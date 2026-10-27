@@ -21,8 +21,8 @@ Dungeons-WinGDK-Shipping.exe
 
 | GDK API | 처리하는 곳 | 설명 |
 |---|---|---|
-| XUser (로그인한 사용자, Xbox Live 토큰) | 1, 세션 파일에서 | 정품 런타임은 Wine에서 로그인하지 못합니다. 런처가 Mac 쪽에서 로그인하고(`macd2 mac-session`), 계정 정보와 게임 서비스용 토큰을 세션 파일에 씁니다. 런타임은 그 파일을 읽고(`MacUser.cpp`, 폴더는 `XODUS_MAC_SESSION`), 게임이 갱신을 요구하면 새 파일을 요청합니다. 갱신용 자격 증명은 Wine 안으로 들어가지 않습니다. |
-| XStore (라이선스, 보유 목록, 패키지 업데이트) | 1 → xodus store 모듈(`xodus_store_test.dll`) → `macd2-broker` | 소유권은 로그인한 계정의 Microsoft 서명 라이선스 토큰으로 확인합니다. 고정 응답은 없습니다. |
+| XUser (로그인한 사용자, Xbox Live 토큰) | 1, 세션 파일에서 | 정품 런타임은 Wine에서 로그인하지 못합니다. 런처가 Mac 쪽에서 로그인하고(`macd2 mac-session`), 계정 정보와 게임 서비스용 토큰을 세션 파일에 씁니다. 런타임은 그 파일을 읽고(`MacUser.cpp`, 폴더는 `XODUS_MAC_SESSION`), 게임이 갱신을 요구하면 새 파일을 요청합니다. |
+| XStore (라이선스, 보유 목록, 패키지 업데이트) | 1 → xodus store 모듈(`xodus_store_test.dll`) → `macd2-broker` | 소유권은 로그인한 계정의 Microsoft 서명 라이선스 토큰으로 확인합니다. |
 | XGameSave | 1, 로컬 저장소 | 프리픽스의 `C:\gamesave`에 저장합니다(`XODUS_LOCAL_GAMESAVE=1`). 저장은 Mac에만 남고 Xbox 클라우드로 올리지 않습니다. 사용자 핸들이 맞도록 세션 파일의 사용자를 씁니다. |
 | XNetworking (연결 상태, libHttpClient 웹소켓의 URL별 TLS 정책) | 1 | 런타임이 직접 응답합니다. macOS의 Wine은 기본 경로가 없다고 알려서, 연결 상태는 인터넷 호스트에 접속해 보고 판단합니다. |
 | XGame, XThreading (XAsync, 작업 큐), 그 밖의 전부 | 2. 정품 런타임 | 런타임이 모르는 클래스는 그대로 넘깁니다. |
@@ -71,9 +71,15 @@ Dungeons-WinGDK-Shipping.exe
 ## Mac에 남는 데이터
 
 - 모두 `~/Library/Application Support/M(a)C Dungeons II`에 있습니다. 게임, Wine 프리픽스(로컬 저장은 `C:\gamesave`), 세션 파일, 로그입니다.
-- Microsoft 계정의 리프레시 토큰은 macOS 키체인("M(a)C Dungeons II" 항목)에 저장하고, Wine 안으로 넘기지 않습니다.
+- Microsoft 계정의 리프레시 토큰은 macOS 키체인("M(a)C Dungeons II" 항목)에 저장합니다.
 - GDK 런타임은 사용자가 라이선스에 동의한 뒤 nuget.org에서 받고, 고정된 SHA-256으로 확인합니다. curl도 같은 방식으로 curl.se에서 받습니다.
 - 게임의 암호화된 실행 파일은 디스크에 암호화된 채로 두고, `macd2 run`이 실행할 때 RAM 디스크에만 풉니다.
+
+## 삭제
+
+1. Minecraft Launcher 연결을 켰다면 먼저 앱에서 끕니다.
+2. 앱과 `~/Library/Application Support/M(a)C Dungeons II`(게임과 로컬 저장)를 삭제합니다.
+3. 키체인 접근에서 이름이 "M(a)C Dungeons II"인 항목을 삭제합니다.
 
 ## 연결 직접 되돌리기
 
