@@ -29,7 +29,9 @@
   // M(a)C Dungeons II's state, shared by the Play button and the download bar.
   // Polled from the app while anything shows it; `pending` covers the seconds
   // between Play and the app answering.
-  var state = { app: null, pending: 0 }, listeners = [], timer = 0;
+  var AGENT = "http://127.0.0.1:__PORT__";
+  // installed: from the app while it runs, else from the agent (Play / Install)
+  var state = { app: null, pending: 0, installed: true }, listeners = [], timer = 0;
   function emit() { listeners.slice().forEach(function (f) { f(state); }); }
   function poll() {
     clearTimeout(timer);
@@ -37,11 +39,14 @@
     fetch(APP + "/status", { cache: "no-store" })
       .then(function (r) { return r.json(); })
       .then(function (j) {
-        state = { app: j, pending: j.stage === "idle" ? state.pending : 0 };
+        state = { app: j, pending: j.stage === "idle" ? state.pending : 0, installed: !!j.installed };
         return 1000;
       }, function () {
-        state = { app: null, pending: state.pending };
-        return state.pending ? 1000 : 3000;   // not running (yet)
+        state = { app: null, pending: state.pending, installed: state.installed };
+        return fetch(AGENT + "/installed", { cache: "no-store" })   // not running (yet)
+          .then(function (r) { return r.json(); })
+          .then(function (j) { state.installed = !!j.installed; }, function () {})
+          .then(function () { return state.pending ? 1000 : 3000; });
       })
       .then(function (ms) {
         if (state.pending && Date.now() - state.pending > 30000) state.pending = 0;
@@ -60,12 +65,14 @@
     return on ? st[0] : null;
   }
 
+  window.__macd2Installed = function () { return state.installed; };
+
   // Play: a launchd agent on PORT opens the app (the launcher drops macd2:// popups)
   window.__macd2 = function () {
     console.log("macd2: play");
     state = { app: state.app, pending: Date.now() };
     emit();
-    fetch("http://127.0.0.1:__PORT__/play", { method: "POST", mode: "no-cors" })
+    fetch(AGENT + "/play", { method: "POST", mode: "no-cors" })
       .catch(function (e) { console.log("macd2: " + e); });
     if (!timer && listeners.length) poll();
     return Promise.resolve();
@@ -97,6 +104,8 @@
         if (t && t.phase === "download")
           return Object.assign(base, { state: "Downloading", currentBytes: t.done, totalBytes: t.total });
         return Object.assign(base, { state: t ? "Finalizing" : "Preparing", note: a.status });
+      case "paused":
+        return Object.assign(base, { state: "Paused", currentBytes: t ? t.done : 0, totalBytes: t ? t.total : 0 });
       case "needsLogin":
       case "needsConsent":
         return Object.assign(base, { state: "Pending", note: a.status });
@@ -107,17 +116,25 @@
     }
   }
   function t_(k) { return t(k); }
+  function post(cmd) {
+    fetch(APP + "/" + cmd, { method: "POST" }).catch(function (e) { console.log("macd2: " + e); });
+  }
   var Bar = null;
   window.__macd2Bar = function (R, DownloadBar) {
     if (!Bar) Bar = function () {
       var s = useAppState(R, true);
       var d = s && downloadData(s);
       if (!d) return null;
+      // pause, resume and cancel act on the game download only
+      var transfer = d.state === "Downloading" || d.state === "Paused";
       return R.createElement(DownloadBar, {
-        downloadData: d, interruptible: false, fixed: true,
-        isCancelEnabled: function () { return false; },
-        onPause: function () {}, onResume: function () {}, onCancel: function () {},
-        additionalStateText: function () { return d.note || null; },
+        downloadData: d, interruptible: transfer, fixed: true,
+        isCancelEnabled: function (st) { return st === "Downloading" || st === "Paused"; },
+        onPause: function () { post("pause"); },
+        onResume: function () { post("resume"); },
+        onCancel: function () { post("cancel"); },
+        // the app's own words stand alone (patched bar text, see mclauncher-link.py)
+        additionalStateText: function () { return d.note ? { macd2: true, text: d.note } : null; },
       });
     };
     return R.createElement(Bar, { key: "macd2ProgressBar" });

@@ -70,9 +70,16 @@ while IFS= read -r line; do
   [[ -z $line ]] && break
   [[ ${line:l} == origin:* ]] && origin=${line#*: }
 done
-cors=$'Access-Control-Allow-Origin: https://mojang\r\nAccess-Control-Allow-Private-Network: true\r\nAccess-Control-Allow-Methods: POST\r\n'
+cors=$'Access-Control-Allow-Origin: https://mojang\r\nAccess-Control-Allow-Private-Network: true\r\nAccess-Control-Allow-Methods: GET, POST\r\n'
 if [[ $origin != https://mojang ]]; then
   printf 'HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n'
+  exit 0
+fi
+if [[ $method == GET && $target == /installed ]]; then
+  # whether the game is installed, for the button's Play/Install (app not running)
+  exe="${0:h}/game/Dungeons/Binaries/WinGDK/Dungeons-WinGDK-Shipping.exe"
+  body='{"installed":false}'; [[ -f $exe ]] && body='{"installed":true}'
+  printf 'HTTP/1.1 200 OK\r\n%sContent-Type: application/json\r\nCache-Control: no-store\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s' "$cors" ${#body} "$body"
   exit 0
 fi
 printf 'HTTP/1.1 204 No Content\r\n%sContent-Length: 0\r\nConnection: close\r\n\r\n' "$cors"
@@ -128,7 +135,7 @@ PLAYABLE_NEW = ('updatePlayable:(e,t)=>{e.productGameConfigs[t.payload.productId
 # for Dungeons II it reports the game as installed, so the button reads Play,
 # and any press opens our app instead of the Store install flow.
 BUTTON = [
-    ("F=!!X&&X.isInstalled", 'F="dungeons2"===e||!!X&&X.isInstalled'),
+    ("F=!!X&&X.isInstalled", 'F="dungeons2"===e?window.__macd2Installed():!!X&&X.isInstalled'),
     ("_=(0,c.useCallback)(((e,a)=>{(0,r.YW)(Q,{play:",
      '_=(0,c.useCallback)(((e,a)=>{if("dungeons2"===Y.productId)return void window.__macd2();(0,r.YW)(Q,{play:'),
     # while M(a)C Dungeons II works or the game runs, the button shows it (mclauncher-link.js)
@@ -136,6 +143,10 @@ BUTTON = [
      "const E=({productId:e,versionId:t,render:a})=>{var E,h,b,x,C,w,y,M,f,v;const MD=window.__macd2Use(c,e);"),
     ('a(_,J,L,O,F))};a.d(t,["A",0,E])', 'a(_,MD||J,L,O,F))};a.d(t,["A",0,E])'),
 ]
+# the download bar's text: an additionalStateText of {macd2, text} replaces the
+# phase word ("Preparing …") instead of following it
+BAR_TEXT = ('return u?r.createElement(r.Fragment,null,_," ",u(s)):_}),[s,u,_,i,n])',
+            'const U=u&&u(s);return U&&U.macd2?U.text:u?r.createElement(r.Fragment,null,_," ",U):_}),[s,u,_,i,n])')
 # the app's progress in the launcher's download bar (every product's bar is listed here)
 BAR = ("return n.createElement(n.Fragment,null,t)}},2735(",
        "return n.createElement(n.Fragment,null,t,window.__macd2Bar(n,s.M))}},2735(")
@@ -147,6 +158,9 @@ def patch_button(src: str) -> str:
     if all(old in src for old, _ in BUTTON):
         for old, new in BUTTON:
             src = src.replace(old, new, 1)
+        changed = True
+    if BAR_TEXT[0] in src:
+        src = src.replace(*BAR_TEXT, 1)
         changed = True
     if BAR[0] in src:
         src = src.replace(*BAR, 1)

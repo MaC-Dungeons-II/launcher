@@ -59,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard urls.contains(where: { $0.scheme == "macd2" }) else { return }
             guard let launcher, let link else { openedByLink = true; return }   // still launching
             if launcher.stage == .failed { launcher.start() }
+            launcher.resumeDownload()   // Play on a paused download
             link.openedFromMinecraftLauncher()
         }
     }
@@ -115,6 +116,9 @@ struct LauncherView: View {
                  destination: URL(string: "https://www.nuget.org/packages/Microsoft.GDK.Windows/2604.4.7897/License")!)
                 .font(.system(size: 12))
             Button("동의하고 계속") { launcher.acceptLicense() }
+                .keyboardShortcut(.defaultAction)
+        case .paused:
+            Button("이어 받기") { launcher.resumeDownload() }
                 .keyboardShortcut(.defaultAction)
         case .failed:
             Button("다시 시도") { launcher.start() }

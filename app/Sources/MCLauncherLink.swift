@@ -1,7 +1,8 @@
 // Minecraft Launcher's Dungeons II page, patched by mac/mclauncher-link.py,
 // starts this app with Play (`open -g -j macd2://play`, hidden) and then shows
 // its state in place of the Play button: it polls http://127.0.0.1:47822/status
-// and posts /show, /stop and /retry. Only that page (Origin https://mojang) is
+// and posts /pause, /resume and /cancel (its download bar) and /show,
+// /stop and /retry. Only that page (Origin https://mojang) is
 // answered. Started this way the app keeps no window or Dock icon until the
 // user has to act (sign-in, the GDK license, an error).
 import AppKit
@@ -109,6 +110,12 @@ final class MCLauncherLink {
             reveal()
         case ("POST", "/stop"):
             launcher.stopGame()
+        case ("POST", "/pause"):
+            launcher.pauseDownload()
+        case ("POST", "/resume"):
+            launcher.resumeDownload()
+        case ("POST", "/cancel"):
+            launcher.cancelDownload()
         case ("POST", "/retry"):
             if launcher.stage == .failed { launcher.start() } else { reveal() }
         default:
@@ -125,8 +132,10 @@ final class MCLauncherLink {
         case .needsLogin: "needsLogin"
         case .playing: "playing"
         case .failed: "failed"
+        case .paused: "paused"
         }
-        var body: [String: Any] = ["stage": stage, "status": launcher.status, "detail": launcher.detail]
+        var body: [String: Any] = ["stage": stage, "status": launcher.status, "detail": launcher.detail,
+                                   "installed": launcher.gameInstalled]
         if let p = launcher.progress { body["progress"] = p }
         if let t = launcher.transfer {
             body["transfer"] = ["phase": t.phase, "update": t.update, "done": t.done, "total": t.total]

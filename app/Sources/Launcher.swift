@@ -9,10 +9,16 @@ import CryptoKit
 @MainActor
 final class Launcher: ObservableObject {
     enum Stage: Equatable {
-        case idle, working, needsConsent, needsLogin, playing, failed
+        case idle, working, needsConsent, needsLogin, playing, failed, paused
     }
 
-    @Published var stage: Stage = .idle
+    @Published var stage: Stage = .idle {
+        didSet { holdActivity(stage == .working || stage == .playing) }
+    }
+    /// Started from Minecraft Launcher the app has no window, and macOS would
+    /// throttle it and its children (App Nap): the download crawled and the
+    /// game would stutter. Held while working or playing.
+    private var activity: NSObjectProtocol? = nil
     @Published var status = "준비 중…"
     @Published var detail = ""
     @Published var progress: Double? = nil
@@ -21,6 +27,12 @@ final class Launcher: ObservableObject {
     struct Transfer { var phase: String; var update: Bool; var done: Double; var total: Double }
     private(set) var transfer: Transfer? = nil
     private var transferIsUpdate = false
+    /// The running game download (`macd2 mac-fetch`), to pause or cancel it
+    /// from Minecraft Launcher's download bar. Interrupting it is safe: the
+    /// download keeps finished chunks and resumes on the next run.
+    private var fetchProcess: Process? = nil
+    private enum DownloadStop { case pause, cancel }
+    private var downloadStop: DownloadStop? = nil
     /// wasdmod (keyboard and mouse as a controller) and its key layout; both
     /// apply from the next game launch.
     @Published var wasdEnabled = UserDefaults.standard.bool(forKey: "wasdmod.enabled") {
@@ -163,6 +175,15 @@ final class Launcher: ObservableObject {
             try await launch()
         } catch is OfflineError {
             failOffline()
+        } catch let stopped as DownloadStopped {
+            if stopped.cancelled {
+                NSApp.terminate(nil)   // as if Play was never pressed
+            } else {
+                let last = transfer
+                stage = .paused
+                set("내려받기 일시 정지됨", "이어 받으면 멈춘 곳부터 계속 받아요")
+                transfer = last
+            }
         } catch {
             fail(error.localizedDescription)
         }
@@ -375,8 +396,16 @@ final class Launcher: ObservableObject {
         speed = 0
         lastSample = nil
         fetchErrorStage = nil
-        let code = await runProcess(cli, ["mac-fetch", Self.productId, data.appendingPathComponent("downloads").path, staging.path],
-                                    env: fetchEnv, log: "fetch.log", onLine: { [weak self] line in self?.fetchProgress(line) })
+        downloadStop = nil
+        let code = await execute(cli, ["mac-fetch", Self.productId, downloads.path, staging.path],
+                                 env: fetchEnv, log: "fetch.log", onLine: { [weak self] line in self?.fetchProgress(line) },
+                                 onStart: { [weak self] p in self?.fetchProcess = p }).code
+        fetchProcess = nil
+        if let stop = downloadStop {
+            downloadStop = nil
+            if stop == .cancel { discardPartialDownload() }
+            throw DownloadStopped(cancelled: stop == .cancel)
+        }
         guard code == 0 else {
             switch fetchErrorStage {
             case "disk-full": throw LauncherError("저장 공간이 부족해요. 약 20GB가 필요해요.")
@@ -400,6 +429,46 @@ final class Launcher: ObservableObject {
             try fm.moveItem(at: staging, to: game)
         }
         try JSONSerialization.data(withJSONObject: ["version": latest]).write(to: stateFile, options: .atomic)
+    }
+
+    var downloads: URL { data.appendingPathComponent("downloads") }
+    var gameInstalled: Bool { fm.fileExists(atPath: gameBinaries.appendingPathComponent(Self.gameExe).path) }
+
+    private func holdActivity(_ on: Bool) {
+        if on, activity == nil {
+            activity = ProcessInfo.processInfo.beginActivity(
+                options: [.userInitiated, .idleSystemSleepDisabled, .latencyCritical],
+                reason: "game download or play")
+        } else if !on, let a = activity {
+            ProcessInfo.processInfo.endActivity(a)
+            activity = nil
+        }
+    }
+
+    /// Minecraft Launcher's pause and cancel buttons (MCLauncherLink).
+    func pauseDownload() { stopDownload(.pause) }
+    func cancelDownload() {
+        if stage == .paused {
+            discardPartialDownload()
+            NSApp.terminate(nil)
+        } else {
+            stopDownload(.cancel)
+        }
+    }
+    func resumeDownload() { if stage == .paused { start() } }
+
+    /// Only while downloading: stopping the extraction would discard the package.
+    private func stopDownload(_ stop: DownloadStop) {
+        guard transfer?.phase == "download", let p = fetchProcess, p.isRunning else { return }
+        downloadStop = stop
+        p.terminate()
+    }
+
+    /// A fresh start next time: the partial package and the staging folder go.
+    private func discardPartialDownload() {
+        for f in (try? fm.contentsOfDirectory(at: downloads, includingPropertiesForKeys: nil)) ?? []
+        where f.lastPathComponent.contains(".msixvc") { try? fm.removeItem(at: f) }
+        try? fm.removeItem(at: data.appendingPathComponent("game.new"))
     }
 
     private func fetchProgress(_ line: String) {
@@ -1014,6 +1083,7 @@ final class Launcher: ObservableObject {
         p.arguments = args
         if let env { p.environment = env }
         if let cwd { p.currentDirectoryURL = cwd }
+        p.qualityOfService = .userInitiated
         return p
     }
 
@@ -1042,8 +1112,10 @@ final class Launcher: ObservableObject {
     /// arrives after the caller moved on. `timeout` terminates the process.
     private func execute(_ exe: URL, _ args: [String], env: [String: String]? = nil, cwd: URL? = nil,
                          log: String, captureOutput: Bool = false, timeout: TimeInterval? = nil,
-                         onLine: (@MainActor @Sendable (String) -> Void)? = nil) async -> ProcessResult {
+                         onLine: (@MainActor @Sendable (String) -> Void)? = nil,
+                         onStart: ((Process) -> Void)? = nil) async -> ProcessResult {
         let p = makeProcess(exe, args, env: env, cwd: cwd)
+        onStart?(p)
         let h = logHandle(log)
         p.standardError = h ?? FileHandle.nullDevice
         let pipe: Pipe? = (captureOutput || onLine != nil) ? Pipe() : nil
@@ -1071,6 +1143,8 @@ final class Launcher: ObservableObject {
 
 /// Network or service unavailable: shown as "check your connection" with retry.
 struct OfflineError: Error {}
+/// The game download was paused or cancelled by the user.
+struct DownloadStopped: Error { let cancelled: Bool }
 
 struct LauncherError: LocalizedError {
     let message: String
