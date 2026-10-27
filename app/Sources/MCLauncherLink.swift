@@ -153,7 +153,8 @@ final class MCLauncherLink {
         case .working: "working"
         case .needsConsent: "needsConsent"
         case .needsLogin: "needsLogin"
-        case .playing: "playing"
+        // until its window shows, the launcher's bar says the game is opening
+        case .playing: launcher.gameWindowShown ? "playing" : "working"
         case .failed: "failed"
         case .paused: "paused"
         }

@@ -233,6 +233,8 @@ struct LauncherView: View {
                 Button(launcher.gameInstalled ? "플레이" : "설치") { launcher.play() }
                     .buttonStyle(PlayButton())
                     .keyboardShortcut(.defaultAction)
+            case .playing where !launcher.gameWindowShown:
+                DownloadBar(value: nil, label: "게임을 여는 중", paused: false, animate: !reduceMotion)
             case .playing:
                 Button("게임 실행 중") {}
                     .buttonStyle(PlayButton())

@@ -22,6 +22,8 @@ final class Launcher: ObservableObject {
     @Published var status = "준비 중…"
     @Published var detail = ""
     @Published var progress: Double? = nil
+    /// The game's window is on screen (after .playing starts, it takes a while).
+    @Published private(set) var gameWindowShown = false
     /// The game download or install under way, for Minecraft Launcher's
     /// progress bar (MCLauncherLink); nil otherwise.
     struct Transfer { var phase: String; var update: Bool; var done: Double; var total: Double; var speed: Double = 0 }
@@ -779,9 +781,11 @@ final class Launcher: ObservableObject {
         }
 
         stage = .playing
-        set("게임 실행 중", "게임을 끄면 런처도 함께 정리돼요")
+        gameWindowShown = false
+        set("게임을 여는 중…", "게임 창이 뜨기까지 1분쯤 걸릴 수 있어요")
         usedWine = true
         let watchdog = Task { await self.watchGameExit(env: env) }
+        let opening = Task { await self.waitForGameWindow() }
         // xodus decrypts the encrypted executable into memory with the
         // account's license on every launch; nothing is written decrypted.
         gameRunning = true
@@ -796,6 +800,7 @@ final class Launcher: ObservableObject {
         let stoppedByLauncher = stoppingGame
         stoppingGame = false
         watchdog.cancel()
+        opening.cancel()
         let stoppedByWatchdog = await watchdog.value
         appendLog("game.log", "launcher: game process ended with code \(code)\(stoppedByWatchdog ? " after the exit watchdog stopped Wine" : "")")
         await killWineServer(env: env, log: "game.log")
@@ -899,6 +904,24 @@ final class Launcher: ObservableObject {
 
     /// Game windows currently on screen (not just listed: a hung, finished
     /// game keeps hidden windows around).
+    /// Until the game's window is on screen the launch looks stalled: the
+    /// window says the game is opening, then that it is running.
+    private func waitForGameWindow() async {
+        let wineDir = Self.realPath(wine.path) + "/"
+        while !Task.isCancelled, !gameWindowShown {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            let found = await execute(URL(fileURLWithPath: "/usr/bin/pgrep"), ["-f", Self.gameExe],
+                                      log: "tools.log", captureOutput: true)
+            let pids = String(decoding: found.output, as: UTF8.self)
+                .split(separator: "\n").compactMap { Int32($0) }
+                .filter { Self.realPath(executablePath($0)).hasPrefix(wineDir) }
+            if !Task.isCancelled, stage == .playing, onScreenWindows(of: Set(pids)) > 0 {
+                gameWindowShown = true
+                set("게임 실행 중", "게임을 끄면 런처도 함께 정리돼요")
+            }
+        }
+    }
+
     private func onScreenWindows(of pids: Set<Int32>) -> Int {
         let windows = (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]) ?? []
         return windows.filter { w in
