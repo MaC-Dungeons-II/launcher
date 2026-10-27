@@ -3,8 +3,9 @@
 // its state in place of the Play button: it polls http://127.0.0.1:47822/status
 // and posts /pause, /resume and /cancel (its download bar) and /show,
 // /stop and /retry. Only that page (Origin https://mojang) is
-// answered. Started this way the app keeps no window or Dock icon until the
-// user has to act (sign-in, the GDK license, an error).
+// answered. Started this way the app keeps no window or Dock icon except
+// while the user has to act (sign-in, the GDK license, a pause, an error),
+// and goes back out of sight once the work resumes.
 import AppKit
 import Combine
 import Network
@@ -18,15 +19,17 @@ final class MCLauncherLink {
     private weak var launcher: Launcher?
     private var listener: NWListener?
     private var stageWatch: AnyCancellable?
-    /// Started from Minecraft Launcher's Play button.
-    private(set) var background = false
+    /// Started from Minecraft Launcher's Play button: the launcher shows the
+    /// progress, this app's window only what needs the user.
+    private(set) var driven = false
 
     init(launcher: Launcher) {
         self.launcher = launcher
         stageWatch = launcher.$stage.sink { [weak self] stage in
-            guard let self, self.background else { return }
+            guard let self, self.driven else { return }
             switch stage {
             case .needsLogin, .needsConsent, .failed: self.reveal()
+            case .working, .playing: self.conceal()
             default: break
             }
         }
@@ -47,20 +50,33 @@ final class MCLauncherLink {
     /// The app was opened by macd2://play. Launched hidden (open -j) means the
     /// Minecraft Launcher drives it: drop the Dock icon and stay out of sight.
     func openedFromMinecraftLauncher() {
-        guard NSApp.isHidden, launcher?.stage != .needsLogin, launcher?.stage != .needsConsent,
-              launcher?.stage != .failed else { reveal(); return }
-        background = true
-        NSApp.setActivationPolicy(.accessory)
+        guard NSApp.isHidden || driven else { reveal(); return }   // opened by the user: stays theirs
+        driven = true
+        switch launcher?.stage {
+        case .needsLogin, .needsConsent, .failed: reveal()
+        default: conceal()
+        }
+    }
+
+    private var launcherWindow: NSWindow? {
+        let windows = NSApp.windows.filter { $0.canBecomeMain }
+        return windows.first { $0.identifier?.rawValue.hasPrefix("launcher") == true } ?? windows.first
+    }
+
+    /// Back out of sight: no window, no Dock icon (other windows, e.g. the key
+    /// layout editor, stay).
+    private func conceal() {
+        launcherWindow?.orderOut(nil)
+        if !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) {
+            NSApp.setActivationPolicy(.accessory)
+        }
     }
 
     func reveal() {
-        background = false
         NSApp.setActivationPolicy(.regular)
         NSApp.unhide(nil)
         NSApp.activate(ignoringOtherApps: true)
-        let windows = NSApp.windows.filter { $0.canBecomeMain }
-        (windows.first { $0.identifier?.rawValue.hasPrefix("launcher") == true } ?? windows.first)?
-            .makeKeyAndOrderFront(nil)
+        launcherWindow?.makeKeyAndOrderFront(nil)
     }
 
     /// The display Minecraft Launcher's window is on, for the game to open there.
