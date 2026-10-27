@@ -24,6 +24,17 @@ struct MaCDungeonsApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
+        .commands {
+            CommandGroup(after: .newItem) {
+                // the switch is on the ready screen; elsewhere (before sign-in,
+                // say) a small panel holds it
+                Button("Minecraft Launcher 연결…") {
+                    NSApp.activate(ignoringOtherApps: true)
+                    if launcher.stage != .ready { mcLauncher.panelShown = true }
+                }
+                .disabled(mcLauncher.state == .notInstalled)
+            }
+        }
     }
 }
 
@@ -107,6 +118,7 @@ struct LauncherView: View {
         }
         .background(MCL.grey5)
         .background(WindowChrome())
+        .sheet(isPresented: $mcLauncher.panelShown) { MinecraftLauncherLinkPanel() }
         .preferredColorScheme(.dark)
         .ignoresSafeArea()
     }
@@ -321,6 +333,33 @@ struct MinecraftLauncherLinkRow: View {
     }
 
     private func turnOff() { Task { await link.turnOff() } }
+}
+
+/// The link switch on its own, from the File menu when the ready screen
+/// (which carries it) isn't showing.
+struct MinecraftLauncherLinkPanel: View {
+    @EnvironmentObject var link: MCLauncherPatch
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Minecraft Launcher 연결")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(MCL.light1)
+            MinecraftLauncherLinkRow()
+            Text("로그인과 설치는 Minecraft Launcher에서 플레이를 누르면 이 앱이 이어서 진행해요.")
+                .font(.system(size: 11))
+                .foregroundStyle(MCL.light5)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("닫기") { link.panelShown = false }
+                .buttonStyle(PlayButton())
+                .keyboardShortcut(.defaultAction)
+        }
+        .padding(24)
+        .frame(width: 480)
+        .background(MCL.grey5)
+        .preferredColorScheme(.dark)
+    }
 }
 
 /// Minecraft Launcher's download bar: dark track, green fill, text inside.

@@ -21,6 +21,8 @@ final class MCLauncherPatch: ObservableObject {
 
     @Published private(set) var state: State = .off
     @Published private(set) var busy = false
+    /// The File menu's panel with the switch (App.swift).
+    @Published var panelShown = false
 
     static let port = 47821
     private static let enabledKey = "mclauncher.link"
