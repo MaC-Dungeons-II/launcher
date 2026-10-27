@@ -50,9 +50,28 @@ To do this the app modifies the Minecraft Launcher, so macOS asks you to allow i
 
 Already deleted the app with the link on? See [Removing the Minecraft Launcher link by hand](docs/architecture.md#removing-the-link-by-hand).
 
+## How it works
+
+The game is a Windows GDK title. On a Mac it runs in Wine with our own GDK runtime in its folder.
+
+```
+Dungeons-WinGDK-Shipping.exe
+ ├─ xgameruntime.dll            Flightdeck-based runtime (our fork)
+ │   └─ xgameruntime_original.dll  Microsoft's GDK runtime (downloaded)
+ └─ XCurl.dll                   wrapper over curl.se's libcurl (same fork)
+xodus_store_test.dll ── /tmp/macd2.sock ── macd2-broker   Store licenses (xodus)
+macd2          sign-in, download/extract, launch (xodus)
+```
+
+- Sign-in happens on the Mac (`macd2 mac-session`). The runtime gets the game's Xbox Live tokens from a session file; the refresh token stays in the keychain, outside Wine.
+- Store licenses are checked against your account's Microsoft-signed license through `macd2-broker`.
+- Wine is built from CodeWeavers' CrossOver 26.3 sources. DXMT draws Direct3D 11 with Metal, GStreamer plays the game's videos, SDL handles controllers.
+- Saves are kept in the Wine prefix. Heroes live on the game's servers.
+
+Details: [docs/architecture.md](docs/architecture.md).
+
 ## For developers
 
-- How it works: [docs/architecture.md](docs/architecture.md)
 - Building: [docs/building.md](docs/building.md)
 
 | Component | Repository | License |

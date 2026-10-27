@@ -50,9 +50,28 @@ Mac용 Minecraft Launcher가 있으면 거기서도 Dungeons II를 시작할 수
 
 연결을 켠 채로 앱을 이미 지웠다면 [Minecraft Launcher 연결 직접 되돌리기](docs/architecture.ko.md#연결-직접-되돌리기)를 참고하세요.
 
+## 동작 방식
+
+게임은 Windows용 GDK 타이틀입니다. Mac에서는 Wine 위에서, 게임 폴더에 넣은 자체 GDK 런타임으로 실행합니다.
+
+```
+Dungeons-WinGDK-Shipping.exe
+ ├─ xgameruntime.dll            Flightdeck 기반 런타임 (포크)
+ │   └─ xgameruntime_original.dll  Microsoft GDK 런타임 (내려받음)
+ └─ XCurl.dll                   curl.se libcurl 래퍼 (같은 포크)
+xodus_store_test.dll ── /tmp/macd2.sock ── macd2-broker   Store 라이선스 (xodus)
+macd2          로그인, 다운로드·풀기, 실행 (xodus)
+```
+
+- 로그인은 Mac 쪽에서 합니다(`macd2 mac-session`). 런타임은 세션 파일에서 게임용 Xbox Live 토큰을 받고, 리프레시 토큰은 Wine 밖의 키체인에 둡니다.
+- Store 라이선스는 `macd2-broker`를 거쳐 계정의 Microsoft 서명 라이선스로 확인합니다.
+- Wine은 CodeWeavers CrossOver 26.3 소스로 빌드합니다. DXMT가 Direct3D 11을 Metal로 그리고, GStreamer가 게임 영상을, SDL이 컨트롤러를 맡습니다.
+- 저장은 Wine 프리픽스에 남고, 영웅은 게임 서버에 있습니다.
+
+자세한 내용: [docs/architecture.ko.md](docs/architecture.ko.md)
+
 ## 개발자용
 
-- 구조: [docs/architecture.ko.md](docs/architecture.ko.md)
 - 빌드: [docs/building.ko.md](docs/building.ko.md)
 
 | 구성 요소 | 저장소 | 라이선스 |
