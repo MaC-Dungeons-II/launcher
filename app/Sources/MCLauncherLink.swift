@@ -154,7 +154,7 @@ final class MCLauncherLink {
                                    "installed": launcher.gameInstalled]
         if let p = launcher.progress { body["progress"] = p }
         if let t = launcher.transfer {
-            body["transfer"] = ["phase": t.phase, "update": t.update, "done": t.done, "total": t.total]
+            body["transfer"] = ["phase": t.phase, "update": t.update, "done": t.done, "total": t.total, "speed": t.speed]
         }
         return (try? JSONSerialization.data(withJSONObject: body)) ?? Data("{}".utf8)
     }

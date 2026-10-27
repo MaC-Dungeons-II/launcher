@@ -10,7 +10,7 @@ struct MaCDungeonsApp: App {
         Window("M(a)C Dungeons II", id: "launcher") {
             LauncherView()
                 .environmentObject(launcher)
-                .frame(width: 520, height: 380)
+                .frame(width: 560, height: 340)
                 .onAppear {
                     delegate.launcher = launcher
                     launcher.refreshWasdLayouts()
@@ -79,190 +79,245 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// Minecraft Launcher's palette (its UI's colour tokens), so the window looks
+/// like part of it.
+enum MCL {
+    static func hex(_ v: UInt32) -> Color {
+        Color(red: Double(v >> 16 & 0xFF) / 255, green: Double(v >> 8 & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
+    }
+    static let grey1 = hex(0x6B6562), grey2 = hex(0x514D4C), grey3 = hex(0x3D3938)
+    static let grey4 = hex(0x312D2C), grey5 = hex(0x262423), grey6 = hex(0x171615)
+    static let light1 = hex(0xFCF5F1), light3 = hex(0xD0C5C0), light5 = hex(0xABA09C)
+    static let green3 = hex(0x52A535), green5 = hex(0x3C8527), green6 = hex(0x2A641C)
+    static let red = hex(0xFF605E)
+    // the Dungeons II play button
+    static let orangeTop = hex(0xFDDF93), orangeHi = hex(0xF6C25A), orangeLo = hex(0xF1AD42)
+    static let orangeBottom = hex(0xE89133), orangeText = hex(0x7A3306)
+}
+
 struct LauncherView: View {
     @EnvironmentObject var launcher: Launcher
-
-    private static let green = Color(red: 0.37, green: 0.75, blue: 0.23)
-    private static let ink = Color(red: 0.06, green: 0.06, blue: 0.07)
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            backdrop
-            VStack(spacing: 0) {
-                Spacer(minLength: 34)
-                logo
-                Spacer(minLength: 22)
-                stagePanel
-                    .padding(.horizontal, 40)
-                Spacer(minLength: 16)
-                Text("Mojang·Microsoft와 관계없는 비공식 프로젝트예요")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.white.opacity(0.35))
-                    .padding(.bottom, 14)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Button { NSApp.terminate(nil) } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .frame(width: 26, height: 26)
-                    .background(Circle().fill(.white.opacity(0.08)))
-            }
-            .buttonStyle(.plain)
-            .help("종료")
-            .padding(12)
+        VStack(spacing: 0) {
+            header
+            message
+                .padding(.horizontal, 36)
+                .padding(.vertical, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            playSection
         }
+        .background(MCL.grey5)
         .background(WindowChrome())
         .preferredColorScheme(.dark)
         .ignoresSafeArea()
     }
 
-    private var backdrop: some View {
-        ZStack {
-            Self.ink
-            RadialGradient(colors: [Self.green.opacity(0.28), .clear],
-                           center: .init(x: 0.5, y: 0.0), startRadius: 10, endRadius: 360)
-            LinearGradient(colors: [.clear, .black.opacity(0.45)], startPoint: .center, endPoint: .bottom)
-        }
-    }
+    // MARK: - Header (like a product page's title row)
 
-    private var logo: some View {
-        VStack(spacing: 6) {
-            Text("M(a)C")
-                .font(.system(size: 22, weight: .heavy, design: .rounded))
-                .tracking(6)
-                .foregroundStyle(Self.green)
-            Text("DUNGEONS II")
-                .font(.system(size: 50, weight: .black, design: .rounded))
-                .tracking(1.5)
-                .foregroundStyle(LinearGradient(colors: [.white, Color(white: 0.72)],
-                                                startPoint: .top, endPoint: .bottom))
-                .shadow(color: .black.opacity(0.6), radius: 0, x: 0, y: 3)
-            Text("비공식 Mac 포팅 런처")
-                .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.75))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Capsule().stroke(.white.opacity(0.25)))
-                .padding(.top, 6)
-        }
-    }
-
-    @ViewBuilder private var stagePanel: some View {
-        if launcher.stage == .needsLogin {
-            VStack(spacing: 14) {
-                VStack(spacing: 6) {
-                    Text("이 앱에도 Microsoft 계정 로그인이 한 번 필요해요")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Text("Minecraft Launcher와 별개로 로그인해요. 게임을 구매한 계정으로 로그인해 주세요. 로그인 정보는 이 Mac의 키체인에만 저장돼요.")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Button { launcher.login() } label: {
-                    Text("Microsoft 계정으로 로그인")
-                        .font(.system(size: 13.5, weight: .bold))
-                        .frame(width: 240, height: 36)
-                }
-                .buttonStyle(PrimaryButton(color: Self.green))
-                .keyboardShortcut(.defaultAction)
+    private var header: some View {
+        HStack(spacing: 10) {
+            Text("M(a)C DUNGEONS II")
+                .font(.system(size: 13, weight: .heavy))
+                .tracking(0.6)
+                .foregroundStyle(MCL.light1)
+            Text("비공식")
+                .font(.system(size: 10.5, weight: .bold))
+                .foregroundStyle(MCL.light3)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .overlay(Rectangle().stroke(MCL.grey1, lineWidth: 1))
+            Spacer(minLength: 8)
+            Button { NSApp.terminate(nil) } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(MCL.light1)
+                    .frame(width: 26, height: 26)
+                    .background(MCL.grey3)
+                    .overlay(alignment: .bottom) { Rectangle().fill(MCL.grey6).frame(height: 2) }
             }
-        } else {
-            VStack(spacing: 10) {
-                Text(launcher.status)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                if launcher.progress != nil || launcher.stage == .working {
-                    ProgressBar(value: launcher.progress, color: Self.green)
-                }
-                if !launcher.detail.isEmpty {
-                    Text(launcher.detail)
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .multilineTextAlignment(.center)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                actions.padding(.top, 2)
-            }
+            .buttonStyle(.plain)
+            .help("종료")
+            .accessibilityLabel("M(a)C Dungeons II 종료")
         }
+        .padding(.leading, 18)
+        .padding(.trailing, 12)
+        .frame(height: 46)
+        .background(MCL.grey6)
     }
 
-    @ViewBuilder var actions: some View {
-        switch launcher.stage {
-        case .needsConsent:
-            HStack(spacing: 14) {
+    // MARK: - Message
+
+    @ViewBuilder private var message: some View {
+        VStack(spacing: 10) {
+            switch launcher.stage {
+            case .needsLogin:
+                title("이 앱에도 Microsoft 로그인이 필요해요")
+                body("M(a)C Dungeons II는 Minecraft Launcher와 별도로 로그인하는 비공식 Mac 포팅 런처예요. 게임을 구매한 Microsoft 계정으로 한 번만 로그인하면 돼요.")
+                note("로그인 정보는 이 Mac의 키체인에만 저장돼요.")
+            case .needsConsent:
+                title("Microsoft GDK 라이선스 동의가 필요해요")
+                body(launcher.detail.isEmpty ? "게임이 쓰는 Xbox 런타임을 Microsoft에서 직접 내려받아요." : launcher.detail)
                 Link("라이선스 보기",
                      destination: URL(string: "https://www.nuget.org/packages/Microsoft.GDK.Windows/2604.4.7897/License")!)
-                    .font(.system(size: 12))
-                Button("동의하고 계속") { launcher.acceptLicense() }
-                    .buttonStyle(PrimaryButton(color: Self.green))
-                    .keyboardShortcut(.defaultAction)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(MCL.green3)
+            case .failed:
+                title(launcher.status, color: MCL.red)
+                body(launcher.detail)
+            default:
+                title(launcher.status)
+                body(launcher.detail)
             }
-        case .paused:
-            Button("이어 받기") { launcher.resumeDownload() }
-                .buttonStyle(PrimaryButton(color: Self.green))
-                .keyboardShortcut(.defaultAction)
-        case .failed:
-            Button("다시 시도") { launcher.start() }
-                .buttonStyle(PrimaryButton(color: Self.green))
-                .keyboardShortcut(.defaultAction)
-        default:
-            EmptyView()
         }
+        .frame(maxWidth: 460)
+    }
+
+    private func title(_ text: String, color: Color = MCL.light1) -> some View {
+        Text(text)
+            .font(.system(size: 17, weight: .bold))
+            .foregroundStyle(color)
+            .multilineTextAlignment(.center)
+            .lineLimit(3)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder private func body(_ text: String) -> some View {
+        if !text.isEmpty {
+            Text(text)
+                .font(.system(size: 12.5))
+                .foregroundStyle(MCL.light3)
+                .multilineTextAlignment(.center)
+                .lineSpacing(2)
+                .lineLimit(6)              // long errors end in "…"; the full text is in the tooltip
+                .help(text)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func note(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11))
+            .foregroundStyle(MCL.light5)
+            .multilineTextAlignment(.center)
+    }
+
+    // MARK: - Play section (the launcher's button row and download bar)
+
+    private var playSection: some View {
+        VStack(spacing: 10) {
+            switch launcher.stage {
+            case .needsLogin:
+                Button("Microsoft 계정으로 로그인") { launcher.login() }
+                    .buttonStyle(PlayButton())
+                    .keyboardShortcut(.defaultAction)
+            case .needsConsent:
+                Button("동의하고 계속") { launcher.acceptLicense() }
+                    .buttonStyle(PlayButton())
+                    .keyboardShortcut(.defaultAction)
+            case .paused:
+                DownloadBar(value: launcher.progress, label: "일시 정지됨", paused: true, animate: false)
+                Button("이어 받기") { launcher.resumeDownload() }
+                    .buttonStyle(PlayButton())
+                    .keyboardShortcut(.defaultAction)
+            case .failed:
+                Button("다시 시도") { launcher.start() }
+                    .buttonStyle(PlayButton())
+                    .keyboardShortcut(.defaultAction)
+            case .playing:
+                Button("게임 실행 중") {}
+                    .buttonStyle(PlayButton())
+                    .disabled(true)
+            default:
+                DownloadBar(value: launcher.progress, label: barLabel, paused: false, animate: !reduceMotion)
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity)
+        .background(MCL.grey4)
+        .overlay(alignment: .top) { Rectangle().fill(MCL.grey3).frame(height: 2) }
+    }
+
+    /// Bytes, speed and time left while downloading (the detail line), else
+    /// the percentage.
+    private var barLabel: String {
+        if launcher.transfer?.phase == "download", !launcher.detail.isEmpty { return launcher.detail }
+        guard let p = launcher.progress else { return "준비 중" }
+        return "\(Int((p * 100).rounded()))%"
     }
 }
 
-/// A flat bar; nil is indeterminate (a sliding segment).
-struct ProgressBar: View {
+/// Minecraft Launcher's download bar: dark track, green fill, text inside.
+/// nil progress shows an empty bar with a moving sheen (unless reduced motion).
+struct DownloadBar: View {
     let value: Double?
-    let color: Color
-    @State private var phase: CGFloat = 0
+    let label: String
+    let paused: Bool
+    let animate: Bool
+    @State private var sweep: CGFloat = -0.3
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 3).fill(.white.opacity(0.1))
+                Rectangle().fill(MCL.grey6)
                 if let value {
-                    RoundedRectangle(cornerRadius: 3).fill(color)
-                        .frame(width: max(6, geo.size.width * min(max(value, 0), 1)))
-                        .animation(.easeOut(duration: 0.4), value: value)
-                } else {
-                    RoundedRectangle(cornerRadius: 3).fill(color)
+                    Rectangle()
+                        .fill(paused ? MCL.grey3 : MCL.green5)
+                        .frame(width: geo.size.width * min(max(value, 0), 1))
+                        .animation(.linear(duration: 0.5), value: value)
+                } else if animate {
+                    LinearGradient(colors: [.clear, MCL.green5.opacity(0.55), .clear], startPoint: .leading, endPoint: .trailing)
                         .frame(width: geo.size.width * 0.3)
-                        .offset(x: (geo.size.width * 1.3) * phase - geo.size.width * 0.3)
+                        .offset(x: geo.size.width * sweep)
                         .onAppear {
-                            withAnimation(.linear(duration: 1.3).repeatForever(autoreverses: false)) { phase = 1 }
+                            withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) { sweep = 1 }
                         }
                 }
+                Text(label)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(MCL.light1)
+                    .lineLimit(1)
+                    .padding(.horizontal, 14)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 3))
+            .clipped()
         }
-        .frame(height: 8)
+        .frame(height: 32)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(value.map { "\(Int(($0 * 100).rounded()))%" } ?? "")
     }
 }
 
-/// A solid, slightly blocky button with a darker bottom edge.
-struct PrimaryButton: ButtonStyle {
-    let color: Color
+/// The Dungeons II play button: black outline, light top edge, darker bottom
+/// edge, two-tone fill.
+struct PlayButton: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 13, weight: .bold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 7)
+        let pressed = configuration.isPressed
+        return configuration.label
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(isEnabled ? MCL.orangeText : MCL.light5)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 28)
+            .frame(minWidth: 280, minHeight: 46)
             .background(
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(color.opacity(configuration.isPressed ? 0.75 : 1))
-                    .overlay(alignment: .bottom) {
-                        Rectangle().fill(.black.opacity(0.3)).frame(height: 3)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                    }
+                LinearGradient(colors: isEnabled ? [MCL.orangeHi, MCL.orangeLo] : [MCL.grey2, MCL.grey3],
+                               startPoint: .top, endPoint: .bottom)
+                    .brightness(pressed ? -0.06 : 0)
             )
-            .offset(y: configuration.isPressed ? 1 : 0)
+            .overlay(alignment: .top) {
+                Rectangle().fill(isEnabled ? MCL.orangeTop : MCL.grey1).frame(height: pressed ? 2 : 4)
+            }
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(isEnabled ? MCL.orangeBottom : MCL.grey4).frame(height: pressed ? 2 : 4)
+            }
+            .overlay(Rectangle().stroke(.black, lineWidth: 2))
+            .contentShape(Rectangle())
     }
 }
 
@@ -276,7 +331,7 @@ private struct WindowChrome: NSViewRepresentable {
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.isMovableByWindowBackground = true
-            window.backgroundColor = .black
+            window.backgroundColor = NSColor(red: 0x26 / 255, green: 0x24 / 255, blue: 0x23 / 255, alpha: 1)
             for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
                 window.standardWindowButton(kind)?.isHidden = true
             }

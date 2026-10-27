@@ -24,7 +24,7 @@ final class Launcher: ObservableObject {
     @Published var progress: Double? = nil
     /// The game download or install under way, for Minecraft Launcher's
     /// progress bar (MCLauncherLink); nil otherwise.
-    struct Transfer { var phase: String; var update: Bool; var done: Double; var total: Double }
+    struct Transfer { var phase: String; var update: Bool; var done: Double; var total: Double; var speed: Double = 0 }
     private(set) var transfer: Transfer? = nil
     private var transferIsUpdate = false
     /// The running game download (`macd2 mac-fetch`), to pause or cancel it
@@ -477,7 +477,6 @@ final class Launcher: ObservableObject {
         case "download":
             if let done = j["done"] as? Double, let total = j["total"] as? Double, total > 0 {
                 progress = min(max(done / total, 0), 1)
-                transfer = Transfer(phase: "download", update: transferIsUpdate, done: done, total: total)
                 let now = Date()
                 if let (t0, d0) = lastSample {
                     let dt = now.timeIntervalSince(t0)
@@ -490,6 +489,8 @@ final class Launcher: ObservableObject {
                 } else {
                     lastSample = (now, done)
                 }
+                transfer = Transfer(phase: "download", update: transferIsUpdate, done: done, total: total,
+                                    speed: speed > 100_000 ? speed : 0)
                 var text = String(format: "%.1f / %.1f GB", done / 1e9, total / 1e9)
                 if speed > 100_000 {   // below ~100 KB/s the estimate is meaningless
                     text += String(format: " · %.1f MB/s", speed / 1e6)

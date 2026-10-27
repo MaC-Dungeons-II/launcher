@@ -102,7 +102,8 @@
     switch (a.stage) {
       case "working":
         if (t && t.phase === "download")
-          return Object.assign(base, { state: "Downloading", currentBytes: t.done, totalBytes: t.total });
+          return Object.assign(base, { state: "Downloading", currentBytes: t.done, totalBytes: t.total,
+                                       note: speedText(t) });
         return Object.assign(base, { state: t ? "Finalizing" : "Preparing", note: a.status });
       case "paused":
         return Object.assign(base, { state: "Paused", currentBytes: t ? t.done : 0, totalBytes: t ? t.total : 0 });
@@ -116,6 +117,14 @@
     }
   }
   function t_(k) { return t(k); }
+  // "20.9 MB/s · 약 7분 남음" (nothing until the app has a steady speed)
+  function speedText(tr) {
+    if (!tr.speed) return null;
+    var left = Math.max(tr.total - tr.done, 0) / tr.speed, min = Math.ceil(left / 60);
+    var rate = (tr.speed / 1e6).toFixed(1) + " MB/s";
+    if (korean()) return rate + " · " + (min > 1 ? "약 " + min + "분 남음" : "1분 이내");
+    return rate + " · " + (min > 1 ? "about " + min + " min left" : "under a minute");
+  }
   function post(cmd) {
     fetch(APP + "/" + cmd, { method: "POST" }).catch(function (e) { console.log("macd2: " + e); });
   }
