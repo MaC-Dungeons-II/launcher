@@ -61,8 +61,7 @@ final class Launcher: ObservableObject {
     var gameOld: URL { data.appendingPathComponent("game.old") }
     var lockFile: URL { data.appendingPathComponent(".lock") }
     var brokerPidFile: URL { data.appendingPathComponent("broker.pid") }
-    /// `mac-session --serve`, run by versions with the mcd2 adapter; still
-    /// stopped if one was left running.
+    /// `mac-session --serve`, which keeps the session file fresh while playing.
     var sessionPidFile: URL { data.appendingPathComponent("session-serve.pid") }
     static let brokerSocket = "/tmp/macd2.sock"
     static let rotatedLogs = ["game.log", "fetch.log", "broker.log", "session.log", "prefix.log"]
@@ -153,7 +152,7 @@ final class Launcher: ObservableObject {
         stage = .working
         do {
             try fm.createDirectory(at: data, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            for dir in [deps, logs] { try fm.createDirectory(at: dir, withIntermediateDirectories: true) }
+            for dir in [deps, session, logs] { try fm.createDirectory(at: dir, withIntermediateDirectories: true) }
             guard try acquireLock() else {
                 stage = .failed
                 set("이미 실행 중이에요.", "다른 M(a)C Dungeons II 창을 닫고 다시 시도해 주세요.")
@@ -163,15 +162,14 @@ final class Launcher: ObservableObject {
                 // once per app launch, before anything touches the game or helpers
                 try restoreGameFolder()
                 rotateLogs()
-                // the removed mcd2 adapter's session file (Xbox tokens) and logs
-                try? fm.removeItem(at: session)
                 await stopStaleHelpers()
                 prepared = true
             }
 
             set("Microsoft 계정 확인 중…")
-            // signs in to the Xbox services without writing anything (the runtime signs in by itself)
-            let check = await execute(cli, ["mac-session", session.path, "--check"], log: "session.log", timeout: 60)
+            // signs in to the title's Xbox services and writes the session file
+            // the runtime's XUser reads (private, in the data folder)
+            let check = await execute(cli, ["mac-session", session.path], log: "session.log", timeout: 60)
             if check.timedOut || check.code == 69 {
                 failOffline()
                 return
@@ -567,11 +565,24 @@ final class Launcher: ObservableObject {
         for name in ["xgameruntime-native.dll", "xgameruntime-adapter-thunks.dll", "dungeons-crossover.ini"] {
             try? fm.removeItem(at: gameBinaries.appendingPathComponent(name))
         }
+        // Diagnostics: MACD2_LAYER_DIR=<folder> in debug.env copies every file
+        // in that folder next to the game afterwards (e.g. another runtime build).
+        if let dir = debugOverrides()["MACD2_LAYER_DIR"], !dir.isEmpty {
+            let extra = URL(fileURLWithPath: (dir as NSString).expandingTildeInPath)
+            for name in (try? fm.contentsOfDirectory(atPath: extra.path)) ?? [] where !name.hasPrefix(".") {
+                try replace(gameBinaries.appendingPathComponent(name), with: extra.appendingPathComponent(name))
+            }
+            appendLog("game.log", "launcher: layer files from \(extra.path) (MACD2_LAYER_DIR)")
+        }
         for base in [gameBinaries, gameBinaries.deletingLastPathComponent()] {
             let certs = base.appendingPathComponent("etc/ssl/certs")
             try fm.createDirectory(at: certs, withIntermediateDirectories: true)
             try replace(certs.appendingPathComponent("ca-bundle.crt"), with: caBundle)
         }
+    }
+
+    private func windowsPath(_ url: URL) -> String {
+        "Z:" + url.path.replacingOccurrences(of: "/", with: "\\")
     }
 
     private func replace(_ target: URL, with source: URL) throws {
@@ -730,8 +741,9 @@ final class Launcher: ObservableObject {
     /// Refresh the ones this launcher replaces: GameInput (controllers), the
     /// media decoders, and DXMT (d3d11/dxgi on Metal) so runtime updates apply.
     private func syncBuiltins() {
+        // the prefix keeps its own copies of these; refresh them from the runtime
         for name in ["gameinput.dll", "winedmo.dll", "winegstreamer.dll",
-                     "d3d11.dll", "dxgi.dll", "d3d10core.dll", "winemetal.dll"] {
+                     "d3d11.dll", "dxgi.dll", "d3d10core.dll", "winemetal.dll", "xodus_store_test.dll"] {
             let src = wine.appendingPathComponent("lib/wine/\(winePEDir)/\(name)")
             if fm.fileExists(atPath: src.path) { try? replace(system32.appendingPathComponent(name), with: src) }
         }
@@ -745,7 +757,8 @@ final class Launcher: ObservableObject {
         var env = wineEnv
         env["SSL_CERT_FILE"] = prefixCaBundle
         env["CURL_CA_BUNDLE"] = prefixCaBundle
-        env["XODUS_USER_RUNTIME"] = "1"
+        env["XODUS_USER_RUNTIME"] = "1"   // Store queries go through the Xodus user runtime
+        env["XODUS_MAC_SESSION"] = windowsPath(session)   // XUser from the session file (runtime MacUser.cpp)
         env["XODUS_LOCAL_GAMESAVE"] = "1"
         env["XODUS_LOCAL_GAMESAVE_ROOT"] = "C:\\gamesave"
         env["XODUS_USER_SOCKET_SUFFIX"] = "macd2.sock"
@@ -770,6 +783,11 @@ final class Launcher: ObservableObject {
         }
         helpers.append(brokerProcess)
         writePid(brokerProcess, to: brokerPidFile)
+        // keeps the session file current and answers the runtime's refresh requests
+        if let serve = spawn(cli, ["mac-session", session.path, "--serve"], env: nil, log: "session.log") {
+            helpers.append(serve)
+            writePid(serve, to: sessionPidFile)
+        }
         // wait until the broker accepts connections (up to ~10 s)
         let deadline = Date().addingTimeInterval(10)
         while !Self.socketAccepts(Self.brokerSocket) {
