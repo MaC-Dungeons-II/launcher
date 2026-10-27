@@ -68,6 +68,20 @@ Dungeons-WinGDK-Shipping.exe
 - 앱이 실행 중일 때는 앱이 직접 `127.0.0.1:47822`에서 대기합니다(`MCLauncherLink.swift`). 런처 화면이 다운로드 막대에 쓸 상태를 가져가고, 일시 정지·이어 받기·취소·창 보기·중지·다시 시도를 요청합니다.
 - 두 곳 모두 `Origin: https://mojang`(런처 화면)인 요청에만 응답합니다.
 
+## Mac에 남는 데이터
+
+- 모두 `~/Library/Application Support/M(a)C Dungeons II`에 있습니다. 게임, Wine 프리픽스(로컬 저장은 `C:\gamesave`), 세션 파일, 로그입니다.
+- Microsoft 계정의 리프레시 토큰은 macOS 키체인("M(a)C Dungeons II" 항목)에 저장하고, Wine 안으로 넘기지 않습니다.
+- GDK 런타임은 사용자가 라이선스에 동의한 뒤 nuget.org에서 받고, 고정된 SHA-256으로 확인합니다. curl도 같은 방식으로 curl.se에서 받습니다.
+- 게임의 암호화된 실행 파일은 디스크에 암호화된 채로 두고, `macd2 run`이 실행할 때 RAM 디스크에만 풉니다.
+
+## 연결 직접 되돌리기
+
+Minecraft Launcher 연결을 켠 채로 앱을 지웠다면:
+
+1. `~/Library/LaunchAgents/io.github.mac-dungeons-ii.link.plist`를 지우고, 로그아웃하거나 `launchctl bootout gui/$(id -u)/io.github.mac-dungeons-ii.link`를 실행합니다.
+2. `~/Library/Application Support/minecraft/macd2-ui.zip.orig`를 `~/Library/Application Support/minecraft/launcher/launcher.bundle/Contents/Resources/ui.zip` 자리에 복사하고, `macd2-ui.zip.orig`는 지웁니다.
+
 ## 디버깅용 환경 변수
 
 | 변수 | 효과 |

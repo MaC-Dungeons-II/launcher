@@ -68,6 +68,20 @@ Off unless the user turns it on in the app (`MCLauncherPatch.swift`, `app/Resour
 - While running, the app itself listens on `127.0.0.1:47822` (`MCLauncherLink.swift`). The launcher page polls its status for the download bar and posts pause, resume, cancel, show, stop and retry.
 - Both listeners answer only requests with `Origin: https://mojang` (the launcher page).
 
+## Data on the Mac
+
+- Everything is in `~/Library/Application Support/M(a)C Dungeons II`: the game, the Wine prefix (with the local saves in `C:\gamesave`), the session file and logs.
+- The Microsoft account's refresh token is kept in the macOS keychain (service "M(a)C Dungeons II"). It stays outside Wine.
+- The GDK runtime is downloaded from nuget.org after the user accepts its license, and checked against a pinned SHA-256. curl comes from curl.se the same way.
+- The game's encrypted executables stay encrypted on disk; `macd2 run` decrypts them into a RAM disk at launch.
+
+## Removing the link by hand
+
+If the app was deleted while the Minecraft Launcher link was on:
+
+1. Remove `~/Library/LaunchAgents/io.github.mac-dungeons-ii.link.plist`, then log out or run `launchctl bootout gui/$(id -u)/io.github.mac-dungeons-ii.link`.
+2. Copy `~/Library/Application Support/minecraft/macd2-ui.zip.orig` over `~/Library/Application Support/minecraft/launcher/launcher.bundle/Contents/Resources/ui.zip`, then delete `macd2-ui.zip.orig`.
+
 ## Debugging switches
 
 | Variable | Effect |

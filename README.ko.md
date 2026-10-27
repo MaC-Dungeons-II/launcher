@@ -2,144 +2,58 @@
 
 [English](README.md) · **한국어**
 
-Minecraft Launcher(Microsoft Store)판 **Minecraft Dungeons II**를 macOS에서 실행하는 비공식 런처입니다.
-Microsoft 계정으로 로그인하면 본인 라이선스로 게임을 내려받아 Wine에서 실행합니다. 가상 머신이나 Windows PC 스트리밍 없이 앱 하나로 동작합니다.
+Minecraft Launcher(Microsoft Store)판 **Minecraft Dungeons II**를 Mac에서 실행하는 비공식 런처입니다.
 
 > [!CAUTION]
 > 비공식 프로젝트입니다. 사용에 따른 책임은 사용자에게 있습니다. Mojang, Microsoft, Xbox와 관련이 없으며 이들의 승인이나 후원을 받지 않았습니다. Minecraft, Minecraft Dungeons를 비롯해 여기 나오는 상표, 제품명, 회사명, 로고는 각 소유자의 것입니다.
 
 > [!IMPORTANT]
-> **게임을 구매한 계정이 있어야 합니다.** 라이선스 확인을 우회하지 않습니다. 게임은 계정의 Microsoft 서명 라이선스를 그대로 확인하고, 소유하지 않은 계정으로는 실행되지 않습니다.
-
-Steam판은 Linux/Steam Deck 대응 업데이트를 받았지만 Launcher판은 받지 못했습니다. 그래서 Launcher판을 Mac에서 돌리려고 만들었습니다.
+> **게임을 구매한 계정이 있어야 합니다.** 라이선스 확인을 우회하지 않으며, 소유하지 않은 계정으로는 실행되지 않습니다.
 
 ## 되는 것
 
-M4 MacBook(macOS 27)에서 확인했습니다.
+M4 MacBook(macOS 27)에서 확인했습니다: 기존 영웅으로 온라인 플레이, 설정과 저장, 게임 영상, 블루투스 Xbox 컨트롤러. 게임 업데이트로 동작이 깨질 수 있습니다.
 
-- 온라인 플레이, Windows에서 쓰던 기존 영웅
-- 설정·저장
-- 인트로와 게임 안 영상
-- 블루투스 Xbox 컨트롤러
-- 게임 메뉴에서 종료 (런처가 Wine까지 정리함)
-
-기기 한 대에서만 시험했습니다. 게임 업데이트로 동작이 깨질 수 있습니다.
+아직 안 되는 것: 저장은 Mac에만 남고(Xbox 클라우드 동기화 없음), 게임 업데이트 때마다 전체 패키지를 다시 받습니다.
 
 ## 요구 사항
 
-- Apple Silicon Mac, Rosetta 2
-- macOS 14 이상
+- Apple Silicon Mac(Rosetta 2), macOS 14 이상
 - Minecraft Dungeons II를 소유한 Microsoft 계정
-- 첫 설치 시 여유 공간 약 25GB (다운로드 약 10GB)
+- 첫 설치 시 여유 공간 약 25GB
 
 ## 설치
 
 1. [Releases](../../releases)에서 `MaC-Dungeons-II.dmg`를 받아 열고, 앱을 Applications로 끌어다 놓습니다.
-2. 앱을 엽니다. 공증(notarization)을 받지 않은 앱이라 처음에는 macOS가 막습니다. **시스템 설정 → 개인정보 보호 및 보안**에서 **그래도 열기**를 누릅니다.
+2. 앱을 엽니다. 공증을 받지 않은 앱이라 처음에는 macOS가 막습니다. **시스템 설정 → 개인정보 보호 및 보안**에서 **그래도 열기**를 누릅니다.
 
-## 사용
+## 플레이
 
-창은 Minecraft Launcher를 본떠 꾸몄습니다. 앱을 열면 다음 순서로 진행합니다.
-
-1. Microsoft 계정을 확인합니다. Minecraft Launcher와 별개로 이 앱에서 따로 로그인합니다. 리프레시 토큰은 macOS 키체인("M(a)C Dungeons II" 항목)에 저장합니다.
-2. Microsoft GDK 런타임 라이선스 동의를 한 번 받습니다. 그다음 런타임을 nuget.org에서 받고 SHA-256을 확인합니다.
-3. 게임이 없으면 **설치**, 있으면 **플레이** 버튼을 보여 줍니다.
-
-설치(업데이트가 있을 때는 플레이)를 누르면 Microsoft CDN에서 게임을 받아 풉니다. 다운로드 막대에 받은 용량, 속도, 남은 시간이 나오고, 일시 정지와 이어 받기를 할 수 있습니다. 병렬로 받고, 중단된 곳부터 이어 받습니다. 끝나면 게임이 실행됩니다.
+1. Microsoft 계정으로 로그인합니다. Minecraft Launcher 로그인과는 별개입니다.
+2. Microsoft GDK 라이선스에 동의합니다(한 번만).
+3. **설치**를 누릅니다. 설치가 끝난 뒤에는 **플레이**를 누릅니다.
 
 ## Minecraft Launcher에서 플레이 (선택)
 
-기본은 꺼져 있습니다. **Minecraft Launcher에서도 플레이** 스위치로 켭니다. 스위치는 앱의 플레이 준비 화면에 있고, **파일 → Minecraft Launcher 연결…** 메뉴로는 언제든(로그인 전에도) 열 수 있습니다. 이 스위치는 Mac용 Minecraft Launcher가 설치되어 있을 때만 보입니다. 켜기 전에 무엇을 바꾸는지 알려 주고 확인을 받습니다.
+Mac용 Minecraft Launcher가 있으면 거기서도 Dungeons II를 시작할 수 있습니다. 앱의 플레이 준비 화면이나 **파일 → Minecraft Launcher 연결…**에서 **Minecraft Launcher에서도 플레이**를 켭니다.
 
-켜면 다음과 같이 동작합니다.
+그러면 Minecraft Launcher의 Dungeons II 화면에 설치/플레이 버튼이 생기고, 다운로드도 거기에 표시됩니다. 이 앱은 숨은 채로 돌다가 로그인처럼 직접 해야 할 일이 있을 때만 창을 띄웁니다.
 
-- Minecraft Launcher의 Dungeons II 화면에 플레이 버튼(게임이 없으면 설치 버튼)이 생기고, 제목에 "(UNOFFICIAL MAC PORT)"가 붙습니다. 누르면 이 앱이 숨은 채로 열리고, 진행 상황은 Minecraft Launcher의 다운로드 막대에 나옵니다(일시 정지, 이어 받기, 취소 가능). 로그인, GDK 라이선스, 오류처럼 직접 해야 할 일이 있을 때만 앱 창이 나타납니다.
-- 이를 위해 Minecraft Launcher의 화면 파일(`ui.zip`)에서 Dungeons II 부분만 고칩니다. 원본은 `~/Library/Application Support/minecraft/macd2-ui.zip.orig`로 보관합니다.
-- 사용자별 LaunchAgent `io.github.mac-dungeons-ii.link`를 설치합니다. launchd가 `127.0.0.1:47821`에서 대기하며, Minecraft Launcher 화면에서 온 요청에만 응답합니다.
-- Minecraft Launcher가 업데이트되면 원래 `ui.zip`으로 돌아갑니다. 스위치가 켜져 있으면 다음에 앱을 열 때 다시 적용합니다.
-- macOS가 이 앱이 다른 앱을 수정하도록 허용할지(**앱 관리**) 묻습니다. 허용하지 않으면 패치를 쓸 수 없습니다.
+이를 위해 앱이 Minecraft Launcher를 수정하므로, macOS가 **앱 관리** 권한을 허용할지 묻습니다. 스위치를 끄면 Minecraft Launcher가 원래대로 돌아갑니다.
 
-되돌리려면 스위치를 끄면 됩니다. LaunchAgent를 지우고 원래 `ui.zip`을 복원합니다.
+## 삭제
 
-Mojang 런처를 비공식적으로 고치는 기능이며 Mojang·Microsoft가 지원하지 않습니다. 소유권 확인은 그대로라서 게임을 구매한 계정이 있어야 합니다.
-
-## 구조
-
-게임은 Xbox GDK 런타임을 기대합니다. Mac에서는 Wine 위에 런타임 DLL 하나를 얹어서 맞춥니다.
-
-```
-Dungeons-WinGDK-Shipping.exe
- ├─ xgameruntime.dll            Flightdeck 기반 런타임 (포크)
- │   └─ xgameruntime_original.dll  Microsoft 정품 GDK 런타임 (내려받음)
- └─ XCurl.dll                   curl.se libcurl을 감싼 curl 래퍼 (같은 포크)
-xodus_store_test.dll ── /tmp/macd2.sock ── macd2-broker   Store 라이선스 (xodus)
-macd2          로그인과 세션 파일, 다운로드·풀기, 실행 (xodus)
-```
-
-- 로그인은 Mac 쪽에서 합니다. `macd2 mac-session`이 로그인해서 게임 서비스용 Xbox Live 토큰을 세션 파일에 쓰고, 런타임이 그 사용자를 게임에 넘깁니다(XUser). 갱신용 자격 증명은 Wine 안으로 들어가지 않습니다. Store 라이선스는 `macd2-broker`를 거쳐 Microsoft 서명 라이선스로 확인합니다. 작업 큐는 정품 런타임이 그대로 맡습니다.
-- Wine — CodeWeavers CrossOver 26.3 소스로 직접 빌드
-- DXMT — Direct3D 11 → Metal
-- GStreamer — 게임 영상(H.264) 재생
-- SDL — 컨트롤러 입력
-
-계층별 자세한 설명은 [docs/architecture.ko.md](docs/architecture.ko.md)에 있습니다.
-
-참고:
-
-- 게임 실행 파일은 디스크에 암호화된 상태로 둡니다. 실행할 때 RAM 디스크에만 풀어서 씁니다.
-- 저장은 Wine 프리픽스 안의 로컬 저장소에 남습니다. 영웅은 게임 서버에 있어서 Windows와 똑같이 불러옵니다.
-- 이 저장소와 릴리스에는 Microsoft·Mojang 파일이 없습니다. 게임, GDK 런타임, curl은 앱이 내려받습니다.
-
-## 데이터와 삭제
-
-앱이 저장하는 것은 전부 `~/Library/Application Support/M(a)C Dungeons II`에 있습니다(게임, 저장이 들어 있는 Wine 프리픽스, 로그).
-
-전부 지우려면:
-
-1. Minecraft Launcher 연결을 켰다면 먼저 앱에서 끕니다. Minecraft Launcher가 원래대로 돌아가고 LaunchAgent도 지워집니다. 그다음 `~/Library/Application Support/minecraft/macd2-ui.zip.orig`를 지워도 됩니다.
+1. Minecraft Launcher 연결을 켰다면 먼저 앱에서 끕니다.
 2. 앱을 삭제합니다.
-3. 위 데이터 폴더를 삭제합니다. 로컬 저장도 같이 지워집니다.
+3. `~/Library/Application Support/M(a)C Dungeons II`를 삭제합니다(게임과 저장 데이터).
 4. 키체인 접근에서 이름이 "M(a)C Dungeons II"인 항목을 삭제합니다.
 
-연결을 켠 채로 앱을 지웠다면 `~/Library/LaunchAgents/io.github.mac-dungeons-ii.link.plist`를 지우고(로그아웃하거나 `launchctl bootout gui/$(id -u)/io.github.mac-dungeons-ii.link` 실행), `macd2-ui.zip.orig`를 `~/Library/Application Support/minecraft/launcher/launcher.bundle/Contents/Resources/ui.zip` 자리에 다시 복사합니다.
+연결을 켠 채로 앱을 이미 지웠다면 [Minecraft Launcher 연결 직접 되돌리기](docs/architecture.ko.md#연결-직접-되돌리기)를 참고하세요.
 
-## 빌드
+## 개발자용
 
-> [!IMPORTANT]
-> M4 Mac 한 대에서 빌드했습니다. `mac/build-runtime.sh`는 실제로 실행한 단계를 그대로 옮긴 것이고, 깨끗한 환경에서 처음부터 다시 돌려 보지는 않았습니다.
-
-준비물은 `mac/build-runtime.sh` 머리말에 있습니다. 모두 저장소 안의 `.work/`에 둡니다(git에서 제외됨).
-
-- `mac/patches/`를 적용한 CrossOver 소스
-- llvm-mingw
-- FFmpeg 7.1.1
-- GStreamer 1.28.7
-- SDL 2.32.10
-- DXMT 68af85e
-- GDK-Proton 11-7 빌트인
-- `.work/src-flightdeck`에 [Flightdeck 포크](https://github.com/MaC-Dungeons-II/flightdeck-msfs-2024-linux-xbox) (`macos` 브랜치), 포크의 런타임 패치를 적용한 WineGDK b5d23b0 (`mac/build-store-bridge.sh` 머리말 참고)
-
-순서:
-
-1. `FD=.work/src-flightdeck mac/build-store-bridge.sh` — WineGDK 부분, Flightdeck 포크의 런타임(`xgameruntime.dll`)과 `XCurl.dll`
-2. `mac/build-runtime.sh` — Wine 런타임
-3. [xodus 포크](https://github.com/MaC-Dungeons-II/xodus)에서 `cargo build --release` (Rust 1.98 이상)
-4. `app/build.sh` → `app/dist/`에 앱 생성
-5. `app/dmg/make_dmg.sh` → `app/dist/MaC-Dungeons-II.dmg` 생성
-
-앱 아이콘(Icon Composer 형식, Liquid Glass)을 다시 만들려면 다음을 실행합니다.
-
-```bash
-uv run --no-project --with pillow python app/icon/make_icon.py
-```
-
-## 아직 안 되는 것
-
-- 저장을 Xbox 클라우드로 올리지 않습니다. Mac에만 남습니다.
-- 업데이트를 받을 때 차분 패키지가 아니라 전체 패키지를 다시 받습니다.
-- 공증을 받지 않았습니다.
-
-## 구성 요소
+- 구조: [docs/architecture.ko.md](docs/architecture.ko.md)
+- 빌드: [docs/building.ko.md](docs/building.ko.md)
 
 | 구성 요소 | 저장소 | 라이선스 |
 |---|---|---|
@@ -149,7 +63,7 @@ uv run --no-project --with pillow python app/icon/make_icon.py
 | Wine | CodeWeavers crossover-sources 26.3 | LGPL-2.1+ |
 | DXMT, GDK-Proton, WineGDK, GStreamer, FFmpeg, SDL | [app/NOTICE.md](app/NOTICE.md) 참고 | 각 프로젝트 |
 
-포크는 모두 `macos` 브랜치에 변경 사항이 있습니다.
+이 저장소와 릴리스에는 Microsoft·Mojang 파일이 없습니다. 게임과 GDK 런타임은 앱이 직접 내려받습니다.
 
 ## 감사
 
