@@ -538,9 +538,9 @@ final class Launcher: ObservableObject {
             if let done = j["done"] as? Double, let total = j["total"] as? Double, total > 0 {
                 progress = min(done / total, 1)
                 transfer = Transfer(phase: "install", update: transferIsUpdate, done: done, total: total)
-                detail = String(format: "%.1f / %.1f GB · 계정 라이선스로 패키지를 풀고 있어요", done / 1e9, total / 1e9)
+                detail = String(format: "%.1f / %.1f GB · 게임 파일을 풀고 있어요", done / 1e9, total / 1e9)
             } else {
-                detail = "계정 라이선스로 패키지를 풀고 있어요"; progress = nil
+                detail = "게임 파일을 풀고 있어요"; progress = nil
                 transfer = Transfer(phase: "install", update: transferIsUpdate, done: 0, total: 0)
             }
         case "error":
