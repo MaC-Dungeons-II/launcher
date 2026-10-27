@@ -14,6 +14,7 @@ import Foundation
 final class MCLauncherPatch: ObservableObject {
     enum State: Equatable {
         case notInstalled          // no Minecraft Launcher on this Mac
+        case notReady              // installed, but not opened yet (no ui.zip)
         case off, on
         case failed(String)
     }
@@ -45,8 +46,16 @@ final class MCLauncherPatch: ObservableObject {
         refresh()
     }
 
+    /// Minecraft.app itself (its bundle id), wherever it is installed.
+    private var launcherInstalled: Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.mojang.minecraftlauncher") != nil
+    }
+    /// The app and its UI file, which it downloads on its first start.
+    private var launcherReady: Bool { launcherInstalled && fm.fileExists(atPath: ui.path) }
+
     func refresh() {
-        guard fm.fileExists(atPath: ui.path) else { state = .notInstalled; return }
+        guard launcherInstalled else { state = .notInstalled; return }
+        guard fm.fileExists(atPath: ui.path) else { state = .notReady; return }
         if case .failed = state, enabled { return }
         state = enabled ? .on : .off
     }
@@ -54,7 +63,7 @@ final class MCLauncherPatch: ObservableObject {
     /// While the link is on: re-patch a launcher that updated, and keep the
     /// agent's handler current. Quiet; a failure shows in `state`.
     func keepApplied() async {
-        guard enabled, fm.fileExists(atPath: ui.path) else { refresh(); return }
+        guard enabled, launcherReady else { refresh(); return }
         await run { try await self.apply() }
     }
 
@@ -82,7 +91,7 @@ final class MCLauncherPatch: ObservableObject {
         do {
             try await work()
             state = enabled ? .on : .off
-            if !fm.fileExists(atPath: ui.path) { state = .notInstalled }
+            if !launcherReady { refresh() }
         } catch {
             state = .failed(error.localizedDescription)
         }
@@ -100,7 +109,8 @@ final class MCLauncherPatch: ObservableObject {
     }
 
     private func apply() async throws {
-        guard fm.fileExists(atPath: ui.path) else { throw LinkError("Minecraft Launcher가 설치돼 있지 않아요.") }
+        guard launcherInstalled else { throw LinkError("Minecraft Launcher가 설치돼 있지 않아요.") }
+        guard fm.fileExists(atPath: ui.path) else { throw LinkError("Minecraft Launcher를 한 번 실행한 뒤에 켜 주세요.") }
         let patch = try JSONDecoder().decode(Patch.self, from: Data(contentsOf: resources.appendingPathComponent("patch.json")))
         if try await !isPatched(patch.marker) {
             // the launcher's own (new after each of its updates)

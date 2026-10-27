@@ -18,6 +18,9 @@ struct MaCDungeonsApp: App {
                     launcher.start()
                     Task { await mcLauncher.keepApplied() }   // after a Minecraft Launcher update
                 }
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                    mcLauncher.refresh()   // installed or opened in the meantime
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
@@ -269,7 +272,7 @@ struct MinecraftLauncherLinkRow: View {
                 .toggleStyle(.switch)
                 .controlSize(.mini)
                 .tint(MCL.green5)
-                .disabled(link.busy)
+                .disabled(link.busy || link.state == .notReady)
                 Text(caption)
                     .font(.system(size: 11))
                     .foregroundStyle(isFailed ? MCL.red : MCL.light5)
@@ -290,6 +293,7 @@ struct MinecraftLauncherLinkRow: View {
         if link.busy { return "Minecraft Launcher에 연결하는 중…" }
         switch link.state {
         case .on: return "Minecraft Launcher의 Dungeons II 플레이 버튼으로도 이 앱이 게임을 실행해요."
+        case .notReady: return "Minecraft Launcher를 한 번 실행한 뒤에 켤 수 있어요."
         case .failed(let message): return message
         default: return "선택 기능이에요. 켜면 Minecraft Launcher의 Dungeons II 화면에서도 플레이할 수 있어요."
         }
