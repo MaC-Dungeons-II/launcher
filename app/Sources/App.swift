@@ -328,7 +328,6 @@ struct DownloadBar: View {
     let label: String
     let paused: Bool
     let animate: Bool
-    @State private var sweep: CGFloat = -0.3
 
     var body: some View {
         GeometryReader { geo in
@@ -340,12 +339,14 @@ struct DownloadBar: View {
                         .frame(width: geo.size.width * min(max(value, 0), 1))
                         .animation(.linear(duration: 0.5), value: value)
                 } else if animate {
-                    LinearGradient(colors: [.clear, MCL.green5.opacity(0.55), .clear], startPoint: .leading, endPoint: .trailing)
-                        .frame(width: geo.size.width * 0.3)
-                        .offset(x: geo.size.width * sweep)
-                        .onAppear {
-                            withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) { sweep = 1 }
-                        }
+                    // driven by the clock, so it keeps moving whenever the bar
+                    // turns indeterminate again (an onAppear animation ran once)
+                    TimelineView(.animation) { context in
+                        let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.4) / 1.4
+                        LinearGradient(colors: [.clear, MCL.green5.opacity(0.55), .clear], startPoint: .leading, endPoint: .trailing)
+                            .frame(width: geo.size.width * 0.3)
+                            .offset(x: geo.size.width * (CGFloat(phase) * 1.3 - 0.3))
+                    }
                 }
                 Text(label)
                     .font(.system(size: 12, weight: .medium))

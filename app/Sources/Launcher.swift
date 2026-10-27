@@ -523,10 +523,13 @@ final class Launcher: ObservableObject {
                     lastSample = (now, done)
                 }
                 transfer = Transfer(phase: "download", update: transferIsUpdate, done: done, total: total,
-                                    speed: speed > 100_000 ? speed : 0)
+                                    speed: speed > 10_000 ? speed : 0)
                 var text = String(format: "%.1f / %.1f GB", done / 1e9, total / 1e9)
-                if speed > 100_000 {   // below ~100 KB/s the estimate is meaningless
-                    text += String(format: " · %.1f MB/s", speed / 1e6)
+                if speed > 10_000 {
+                    text += speed >= 1e6 ? String(format: " · %.1f MB/s", speed / 1e6)
+                                         : String(format: " · %.0f KB/s", speed / 1e3)
+                }
+                if speed > 100_000 {   // below ~100 KB/s a time estimate is meaningless
                     let seconds = max(total - done, 0) / speed
                     let left = seconds.isFinite ? Int(min(seconds, 99 * 3600)) : 99 * 3600
                     text += left >= 60 ? " · 약 \(left / 60)분 남음" : " · 1분 이내"
