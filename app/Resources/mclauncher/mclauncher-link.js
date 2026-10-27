@@ -12,7 +12,7 @@
     ko: {
       banner: "Minecraft Dungeons II는 비공식 Mac 포팅 런처 M(a)C Dungeons II를 통해 실행돼요.",
       head: "Mac에서 플레이하기",
-      body: "플레이를 누르면 비공식 포팅 런처 M(a)C Dungeons II가 게임을 실행해요. Mojang·Microsoft와 관계없는 프로젝트라, 문제는 저장소에 알려 주세요.",
+      body: "플레이를 누르면 비공식 포팅 런처 M(a)C Dungeons II가 게임을 실행해요. Mojang, Microsoft와 관계없는 프로젝트라, 문제는 저장소에 알려 주세요.",
       repo: "저장소 바로가기", starting: "M(a)C Dungeons II 시작 중",
       login: "새로 뜬 M(a)C Dungeons II 창에서 Microsoft 계정으로 로그인해 주세요",
       consent: "새로 뜬 M(a)C Dungeons II 창에서 라이선스에 동의해 주세요",
@@ -31,6 +31,19 @@
   function t(k) { return (korean() ? TEXT.ko : TEXT.en)[k]; }
   window.__macd2Repo = "https://github.com/MaC-Dungeons-II/launcher";
   window.__macd2T = t;
+  // after the page title, in every language (it reads as part of the title)
+  window.__macd2TitleSuffix = " (UNOFFICIAL MAC PORT)";
+
+  // The launcher's bar has no indeterminate state: a negative progress (see
+  // downloadData) gets a moving sheen, as in the app's own bar (patch.json).
+  window.__macd2Sheen = "macd2-sheen 1.4s linear infinite";
+  try { if (matchMedia("(prefers-reduced-motion: reduce)").matches) window.__macd2Sheen = "none"; } catch (e) {}
+  (function addKeyframes() {
+    if (!document.head) return void document.addEventListener("DOMContentLoaded", addKeyframes);
+    var st = document.createElement("style");
+    st.textContent = "@keyframes macd2-sheen{from{transform:translateX(-100%)}to{transform:translateX(334%)}}";
+    document.head.appendChild(st);
+  })();
 
   // M(a)C Dungeons II's state, shared by the Play button and the download bar.
   // Polled from the app while anything shows it; `pending` covers the seconds
@@ -100,7 +113,8 @@
   function downloadData(s) {
     var a = s.app, t = a && a.transfer;
     var base = { id: "macd2", productId: "dungeons2", intent: t && t.update ? "Update" : "Install",
-                 progress: a && typeof a.progress === "number" ? a.progress : 0,
+                 // -1: busy without a measure (indeterminate)
+                 progress: a && typeof a.progress === "number" ? a.progress : -1,
                  currentBytes: 0, totalBytes: 0 };
     if (s.pending && (!a || a.stage === "idle"))
       return Object.assign(base, { state: "Preparing", note: t_("starting") });
@@ -112,14 +126,15 @@
                                        note: etaText(t), speed: t.speed });
         return Object.assign(base, { state: t ? "Finalizing" : "Preparing", note: a.status });
       case "paused":
-        return Object.assign(base, { state: "Paused", currentBytes: t ? t.done : 0, totalBytes: t ? t.total : 0 });
+        return Object.assign(base, { state: "Paused", progress: Math.max(base.progress, 0),
+                                     currentBytes: t ? t.done : 0, totalBytes: t ? t.total : 0 });
       // the app's window has opened for these: point there
       case "needsLogin":
-        return Object.assign(base, { state: "Pending", note: t_("login") });
+        return Object.assign(base, { progress: Math.max(base.progress, 0), state: "Pending", note: t_("login") });
       case "needsConsent":
-        return Object.assign(base, { state: "Pending", note: t_("consent") });
+        return Object.assign(base, { progress: Math.max(base.progress, 0), state: "Pending", note: t_("consent") });
       case "failed":
-        return Object.assign(base, { state: "Errored", note: a.status + " · " + t_("failed") });
+        return Object.assign(base, { progress: Math.max(base.progress, 0), state: "Errored", note: a.status + " (" + t_("failed") + ")" });
       default:
         return null;
     }

@@ -72,6 +72,24 @@
     {
      "find": "{ownsGame:r,title:o}=(0,Ae.Vt)(l);return a.createElement(Bt,{message:(0,u.YW)(e,{osx:",
      "replace": "{ownsGame:r,title:o}=(0,Ae.Vt)(l);if(\"dungeons2\"===l)return a.createElement(Bt,{message:a.createElement(a.Fragment,null,a.createElement(\"strong\",null,window.__macd2T(\"head\")),\" \",window.__macd2T(\"body\"))},a.createElement(Wt,null,a.createElement(m.z9,{theme:n,typeramp:i,href:window.__macd2Repo,target:\"_blank\",rel:\"noopener noreferrer\",ariaLabel:window.__macd2T(\"repo\")},window.__macd2T(\"repo\"))));return a.createElement(Bt,{message:(0,u.YW)(e,{osx:"
+    },
+    {
+     "find": "items:s,title:d.title,actions:",
+     "replace": "items:s,title:\"dungeons2\"===r.productId?d.title+window.__macd2TitleSuffix:d.title,actions:"
+    }
+   ]
+  },
+  {
+   "name": "bar-indeterminate",
+   "requireAll": true,
+   "edits": [
+    {
+     "find": "{condition:\"Paused\"===i,style:{backgroundColor:u.A.DARK_GREY_3}}]",
+     "replace": "{condition:\"Paused\"===i,style:{backgroundColor:u.A.DARK_GREY_3}},{condition:e<0,style:{width:\"30%\",border:\"none\",backgroundColor:\"transparent\",backgroundImage:\"linear-gradient(90deg,transparent,rgba(60,133,39,0.75),transparent)\",transition:\"none\",animation:window.__macd2Sheen}}]"
+    },
+    {
+     "find": "\"aria-valuenow\":p,",
+     "replace": "\"aria-valuenow\":p<0?void 0:p,"
     }
    ]
   }
