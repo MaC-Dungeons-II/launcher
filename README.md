@@ -25,7 +25,7 @@ Not yet: saves stay on the Mac (no Xbox cloud sync), and every game update downl
 ## Install
 
 1. Get `MaC-Dungeons-II.dmg` from [Releases](../../releases), open it, and drag the app to Applications.
-2. Open the app. It isn't notarized, so macOS blocks it the first time: go to **System Settings → Privacy & Security** and click **Open Anyway**.
+2. Open the app. If macOS won't open it, click **Open Anyway** in **System Settings → Privacy & Security**.
 
 ## Play
 
