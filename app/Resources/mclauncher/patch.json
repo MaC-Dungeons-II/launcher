@@ -85,7 +85,7 @@
    "edits": [
     {
      "find": "{condition:\"Paused\"===i,style:{backgroundColor:u.A.DARK_GREY_3}}]",
-     "replace": "{condition:\"Paused\"===i,style:{backgroundColor:u.A.DARK_GREY_3}},{condition:e<0,style:{width:\"30%\",border:\"none\",backgroundColor:\"transparent\",backgroundImage:\"linear-gradient(90deg,transparent,rgba(60,133,39,0.75),transparent)\",transition:\"none\",animation:window.__macd2Sheen}}]"
+     "replace": "{condition:\"Paused\"===i,style:{backgroundColor:u.A.DARK_GREY_3}},{condition:e<0,style:{width:\"100%\",border:\"none\",backgroundColor:\"transparent\",backgroundImage:\"linear-gradient(90deg,transparent,rgba(60,133,39,0.75),transparent)\",backgroundSize:\"30% 100%\",backgroundRepeat:\"no-repeat\",backgroundPosition:\"-43% 0\",transition:\"none\",animation:window.__macd2Sheen}}]"
     },
     {
      "find": "\"aria-valuenow\":p,",

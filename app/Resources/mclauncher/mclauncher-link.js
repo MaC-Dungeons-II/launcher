@@ -35,13 +35,14 @@
   window.__macd2TitleSuffix = " (UNOFFICIAL MAC PORT)";
 
   // The launcher's bar has no indeterminate state: a negative progress (see
-  // downloadData) gets a moving sheen, as in the app's own bar (patch.json).
+  // downloadData) gets a moving sheen, as in the app's own bar (patch.json):
+  // a background moved inside the fill, which stays under the text.
   window.__macd2Sheen = "macd2-sheen 1.4s linear infinite";
   try { if (matchMedia("(prefers-reduced-motion: reduce)").matches) window.__macd2Sheen = "none"; } catch (e) {}
   (function addKeyframes() {
     if (!document.head) return void document.addEventListener("DOMContentLoaded", addKeyframes);
     var st = document.createElement("style");
-    st.textContent = "@keyframes macd2-sheen{from{transform:translateX(-100%)}to{transform:translateX(334%)}}";
+    st.textContent = "@keyframes macd2-sheen{from{background-position:-43% 0}to{background-position:143% 0}}";
     document.head.appendChild(st);
   })();
 
