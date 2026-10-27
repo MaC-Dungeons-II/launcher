@@ -3,20 +3,27 @@
 // the Play button (from the app's http://127.0.0.1:47822/status).
 (function () {
   var APP = "http://127.0.0.1:47822";
-  var ko = /^ko/i.test(navigator.language);
+  // the launcher's own language setting (CEF runs with --lang=en-US)
+  function korean() {
+    try { return /^ko/i.test(window.appData.launcherSettings.locale); } catch (e) { return false; }
+  }
   var TEXT = {
-    banner: ko ? "Minecraft Dungeons II는 비공식 Mac 포팅 런처 M(a)C Dungeons II를 통해 실행돼요."
-               : "Minecraft Dungeons II runs on this Mac through M(a)C Dungeons II, an unofficial port.",
-    head: ko ? "Mac에서 플레이하기" : "Playing on Mac",
-    body: ko ? "플레이를 누르면 비공식 포팅 런처 M(a)C Dungeons II가 게임을 실행해요. Mojang·Microsoft와 관계없는 프로젝트라, 문제는 저장소에 알려 주세요."
-             : "Play starts the game through M(a)C Dungeons II, an unofficial port not affiliated with Mojang or Microsoft. Please report problems on its repository.",
-    repo: ko ? "저장소 바로가기" : "Open repository",
-    stop: ko ? "게임 종료" : "Quit game",
-    show: ko ? "M(a)C Dungeons II 열기" : "Open M(a)C Dungeons II",
-    retry: ko ? "다시 시도" : "Try again",
+    ko: {
+      banner: "Minecraft Dungeons II는 비공식 Mac 포팅 런처 M(a)C Dungeons II를 통해 실행돼요.",
+      head: "Mac에서 플레이하기",
+      body: "플레이를 누르면 비공식 포팅 런처 M(a)C Dungeons II가 게임을 실행해요. Mojang·Microsoft와 관계없는 프로젝트라, 문제는 저장소에 알려 주세요.",
+      repo: "저장소 바로가기", stop: "게임 종료", show: "M(a)C Dungeons II 열기", retry: "다시 시도",
+    },
+    en: {
+      banner: "Minecraft Dungeons II runs on this Mac through M(a)C Dungeons II, an unofficial port.",
+      head: "Playing on Mac",
+      body: "Play starts the game through M(a)C Dungeons II, an unofficial port not affiliated with Mojang or Microsoft. Please report problems on our repository.",
+      repo: "Open our repo", stop: "Quit game", show: "Open M(a)C Dungeons II", retry: "Try again",
+    },
   };
+  function t(k) { return (korean() ? TEXT.ko : TEXT.en)[k]; }
   window.__macd2Repo = "https://github.com/MaC-Dungeons-II/launcher";
-  window.__macd2T = function (k) { return TEXT[k]; };
+  window.__macd2T = t;
 
   // Play: a launchd agent on PORT opens the app (the launcher drops macd2:// popups)
   window.__macd2 = function () {
@@ -71,7 +78,7 @@
             type: "button", onClick: function () { post(action); },
             style: { flex: "0 0 auto", background: "#3c8527", color: "#fff", border: "none",
                      padding: "4px 10px", fontSize: "13px", cursor: "pointer" }
-          }, TEXT[action])),
+          }, t(action))),
         pct !== null && h("div", { style: { height: "6px", background: "#48494a" } },
           h("div", { style: { height: "100%", width: pct + "%", background: "#3c8527",
                               transition: "width .5s" } })),
